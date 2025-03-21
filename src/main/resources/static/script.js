@@ -132,7 +132,8 @@ function applyFilter() {
     updateTable();
     updateStats();
     updateCharts();
-    updatePageRankingChart(); // Update the new chart
+    updatePageRankingChart();
+    updateRolePieChart(); // Update the new pie chart
 }
 
 // ✅ Update Table with Pagination
@@ -307,6 +308,65 @@ function updatePageRankingChart() {
                     title: {
                         display: true,
                         text: "Page"
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ✅ Update Role Pie Chart
+function updateRolePieChart() {
+    const roleCounts = {};
+
+    // Count users by role
+    filteredData.forEach(interaction => {
+        const role = interaction.userRole || "Unknown Role";
+        roleCounts[role] = (roleCounts[role] || 0) + 1;
+    });
+
+    // Extract labels and data for the chart
+    const labels = Object.keys(roleCounts);
+    const data = Object.values(roleCounts);
+
+    // Destroy existing chart instance if it exists
+    if (window.rolePieChartInstance) {
+        window.rolePieChartInstance.destroy();
+    }
+
+    // Create the chart
+    const ctx = document.getElementById("rolePieChart").getContext("2d");
+    window.rolePieChartInstance = new Chart(ctx, {
+        type: "pie",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Users by Role",
+                data: data,
+                backgroundColor: [
+                    "#4e79a7", // Soft blue
+                    "#f28e2b", // Orange
+                    "#e15759", // Red
+                    "#76b7b2", // Teal
+                    "#59a14f", // Green
+                    "#edc948", // Yellow
+                    "#b07aa1", // Purple
+                    "#ff9da7", // Pink
+                    "#9c755f", // Brown
+                    "#bab0ac"  // Gray
+                ],
+                borderColor: "#1e1e2e",
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        color: "#ffffff" // White text for legend
                     }
                 }
             }
