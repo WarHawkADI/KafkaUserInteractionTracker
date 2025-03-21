@@ -18,7 +18,6 @@ body {
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-/* Header */
 h2 {
     text-align: center;
     margin-bottom: 30px;
@@ -165,4 +164,26 @@ tbody tr:hover {
     margin-bottom: 20px;
     width: 100%;
     height: 300px; /* Adjust height as needed */
+}
+
+/* Page Buttons */
+.page-button {
+    background-color: #007bff; /* Blue background */
+    color: white; /* White text */
+    padding: 8px 12px; /* Padding for better spacing */
+    border: none; /* Remove default border */
+    border-radius: 5px; /* Rounded corners */
+    cursor: pointer; /* Pointer cursor on hover */
+    font-size: 14px; /* Font size */
+    transition: background-color 0.3s ease, transform 0.2s ease; /* Smooth transitions */
+}
+
+.page-button:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+    transform: scale(1.05); /* Slightly enlarge on hover */
+}
+
+.page-button:active {
+    background-color: #004080; /* Even darker blue on click */
+    transform: scale(0.95); /* Slightly shrink on click */
 }

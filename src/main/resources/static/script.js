@@ -104,13 +104,19 @@ function updateTable() {
             <td>${interaction.userName || "N/A"}</td>
             <td>${interaction.userRole || "N/A"}</td>
             <td>${interaction.actionType || "N/A"}</td>
-            <td>${interaction.pageName || "N/A"}</td>
+            <td><button class="page-button" onclick="redirectToDetails('${interaction.userName}', '${interaction.pageName}')">${interaction.pageName || "N/A"}</button></td>
             <td>${interaction.timestamp || "N/A"}</td>
         </tr>`;
         tableBody.innerHTML += row;
     });
 
     updatePaginationButtons();
+}
+
+// ✅ Redirect to User Page Details
+function redirectToDetails(user, page) {
+    const url = `user-page-details.html?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`;
+    window.open(url, "_blank"); // Opens in a new tab
 }
 
 // ✅ Update Pagination Buttons
