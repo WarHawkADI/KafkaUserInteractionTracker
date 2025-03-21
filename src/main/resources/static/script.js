@@ -20,7 +20,10 @@ async function loadInteractions() {
             return;
         }
 
+        let userSet = new Set();
         data.forEach((interaction, index) => {
+            userSet.add(interaction.userName);
+
             let row = `<tr>
                 <td>${index + 1}</td>
                 <td>${interaction.userName || "N/A"}</td>
@@ -32,48 +35,39 @@ async function loadInteractions() {
             tableBody.innerHTML += row;
         });
 
+        // Update Statistics
+        document.getElementById("totalActions").textContent = data.length;
+        document.getElementById("totalUsers").textContent = userSet.size;
+        document.getElementById("usersWithActions").textContent = userSet.size;
+        document.getElementById("actionsPerUser").textContent = (data.length / userSet.size).toFixed(2);
+
         // Prepare Chart Data
-        const roleCounts = {};
         const actionCounts = {};
         data.forEach(interaction => {
-            roleCounts[interaction.userRole] = (roleCounts[interaction.userRole] || 0) + 1;
             actionCounts[interaction.actionType] = (actionCounts[interaction.actionType] || 0) + 1;
         });
 
-        // Destroy old charts before rendering new ones
-        if (window.roleChartInstance) window.roleChartInstance.destroy();
+        // Destroy old chart before rendering new one
         if (window.actionChartInstance) window.actionChartInstance.destroy();
 
-        // Bar Chart - User Roles
-        window.roleChartInstance = new Chart(document.getElementById("roleChart"), {
+        // Bar Chart - Action Types
+        window.actionChartInstance = new Chart(document.getElementById("actionChart"), {
             type: "bar",
             data: {
-                labels: Object.keys(roleCounts),
+                labels: Object.keys(actionCounts),
                 datasets: [{
-                    label: "User Roles",
-                    data: Object.values(roleCounts),
+                    label: "Actions Performed",
+                    data: Object.values(actionCounts),
                     backgroundColor: "#007bff"
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
-            }
-        });
-
-        // Pie Chart - Action Types
-        window.actionChartInstance = new Chart(document.getElementById("actionChart"), {
-            type: "pie",
-            data: {
-                labels: Object.keys(actionCounts),
-                datasets: [{
-                    data: Object.values(actionCounts),
-                    backgroundColor: ["#ff6384", "#36a2eb", "#ffce56", "#4caf50"]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: "Action Type" } },
+                    y: { title: { display: true, text: "Count" }, beginAtZero: true }
+                }
             }
         });
 
@@ -83,9 +77,13 @@ async function loadInteractions() {
     }
 }
 
-// Ensure refresh and send interactions buttons are working
+// Auto-refresh every 5 seconds without UI flicker
 document.addEventListener("DOMContentLoaded", function () {
+    loadInteractions();
+    setInterval(loadInteractions, 5000);
+
     document.getElementById("refreshButton").addEventListener("click", loadInteractions);
+
     document.getElementById("sendInteractionsButton").addEventListener("click", async function () {
         console.log("Sending interactions...");
         try {
