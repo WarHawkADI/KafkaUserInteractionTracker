@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/interactions")
+
 public class KafkaController {
 
     private final KafkaProducerService kafkaProducerService;
@@ -23,4 +24,6 @@ public class KafkaController {
         kafkaProducerService.sendInteractionsWithDelay(); // ✅ Trigger only on request
         return ResponseEntity.ok("✅ Sending interactions to Kafka at 5-second intervals...");
     }
+
 }
+
