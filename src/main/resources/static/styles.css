@@ -45,7 +45,6 @@ h2 {
     transition: transform 0.3s ease-in-out;
 }
 
-/* Hover Effect */
 .stat-box:hover {
     transform: scale(1.05);
     background-color: #444466;
@@ -78,12 +77,11 @@ button {
     color: white;
 }
 
-#applyFilter {
+#applyFilterButton {
     background-color: green;
     color: white;
 }
 
-/* Hover Effects */
 button:hover {
     opacity: 0.8;
 }
@@ -166,5 +164,3 @@ tbody tr:hover {
     border-radius: 10px;
     margin-bottom: 20px;
 }
-
-/* Checking push done or not */

@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
 <div class="container">
     <h2>Interaction Dashboard</h2>
 
@@ -19,6 +17,7 @@
         <div class="stat-box">Total Users: <span id="totalUsers">0</span></div>
         <div class="stat-box">Users with Actions: <span id="usersWithActions">0</span></div>
         <div class="stat-box">Actions per User: <span id="actionsPerUser">0</span></div>
+        <div class="stat-box">API Hits: <span id="apiHitCount">0</span></div>
     </div>
 
     <!-- Buttons -->
@@ -58,7 +57,6 @@
         </div>
 
         <button id="applyFilterButton">Apply Filter</button>
-
     </div>
 
     <!-- Table -->
@@ -97,6 +95,5 @@
 </div>
 
 <script src="script.js"></script>
-
 </body>
 </html>

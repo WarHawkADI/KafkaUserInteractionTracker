@@ -2,9 +2,13 @@ let currentPage = 1;
 const rowsPerPage = 5;
 let allData = []; // Store all interaction data globally
 let filteredData = []; // Store filtered data
+let apiHitCount = 0; // Counter to track API hits
 
 // ✅ Load Interactions from API
 async function loadInteractions() {
+    apiHitCount++; // Increment the counter
+    console.log(`API hit count: ${apiHitCount}`); // Log the count (optional)
+
     console.log("Fetching latest interactions...");
 
     try {
@@ -138,6 +142,7 @@ function updateStats() {
     document.getElementById("totalUsers").textContent = userSet.size;
     document.getElementById("usersWithActions").textContent = userSet.size;
     document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
+    document.getElementById("apiHitCount").textContent = apiHitCount; // Update API hit count
 }
 
 // ✅ Update Charts
@@ -214,7 +219,6 @@ document.getElementById("sendInteractionsButton").addEventListener("click", asyn
 document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("applyFilterButton").addEventListener("click", applyFilter);
 });
-
 
 // ✅ Auto-refresh every 5 seconds
 document.addEventListener("DOMContentLoaded", function () {
