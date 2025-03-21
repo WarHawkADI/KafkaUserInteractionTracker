@@ -3,6 +3,7 @@ const rowsPerPage = 5;
 let allData = []; // Store all interaction data globally
 let filteredData = []; // Store filtered data
 
+// ✅ Load Interactions from API
 async function loadInteractions() {
     console.log("Fetching latest interactions...");
 
@@ -16,15 +17,15 @@ async function loadInteractions() {
         allData = await response.json();
         console.log("Data received:", allData);
 
-        populateFilterOptions();
-        applyFilter(); // Apply the current filters after loading data
+        populateFilterOptions(); // Populate dropdowns dynamically
+        applyFilter(); // Apply filter to update UI
     } catch (error) {
         console.error("Error loading interactions:", error);
         alert(`Failed to load interactions: ${error.message}`);
     }
 }
 
-// ✅ Populate Filter Options (User, Action, Role, Page)
+// ✅ Dynamically Populate Filter Options
 function populateFilterOptions() {
     const userFilter = document.getElementById("userFilter");
     const actionFilter = document.getElementById("actionFilter");
@@ -54,8 +55,10 @@ function populateFilterOptions() {
     pages.forEach(page => pageFilter.innerHTML += `<option value="${page}">${page}</option>`);
 }
 
-// ✅ Apply Filter
+// ✅ Apply Filters
 function applyFilter() {
+    console.log("Applying filters...");
+
     const selectedUser = document.getElementById("userFilter").value;
     const selectedAction = document.getElementById("actionFilter").value;
     const selectedRole = document.getElementById("roleFilter").value;
@@ -68,7 +71,9 @@ function applyFilter() {
         (selectedPage === "" || interaction.pageName === selectedPage)
     );
 
-    currentPage = 1; // Reset pagination to the first page
+    console.log("Filtered Data:", filteredData);
+
+    currentPage = 1;
     updateTable();
     updateStats();
     updateCharts();
@@ -109,6 +114,7 @@ function updatePaginationButtons() {
     document.getElementById("nextPage").disabled = currentPage * rowsPerPage >= filteredData.length;
 }
 
+// ✅ Pagination Controls
 document.getElementById("prevPage").addEventListener("click", () => {
     if (currentPage > 1) {
         currentPage--;
@@ -134,7 +140,7 @@ function updateStats() {
     document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
 }
 
-// ✅ Update Charts (Includes Total Actions by Day)
+// ✅ Update Charts
 function updateCharts() {
     const actionCounts = {};
     const dailyActions = {};
@@ -146,7 +152,6 @@ function updateCharts() {
         dailyActions[date] = (dailyActions[date] || 0) + 1;
     });
 
-    // ✅ Destroy old charts before rendering new ones
     if (window.actionChartInstance) window.actionChartInstance.destroy();
     if (window.dailyChartInstance) window.dailyChartInstance.destroy();
 
@@ -163,11 +168,7 @@ function updateCharts() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { title: { display: true, text: "Action Type" } },
-                y: { title: { display: true, text: "Count" }, beginAtZero: true }
-            }
+            maintainAspectRatio: false
         }
     });
 
@@ -185,11 +186,7 @@ function updateCharts() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { title: { display: true, text: "Date" } },
-                y: { title: { display: true, text: "Actions" }, beginAtZero: true }
-            }
+            maintainAspectRatio: false
         }
     });
 }
@@ -199,9 +196,7 @@ document.getElementById("sendInteractionsButton").addEventListener("click", asyn
     console.log("Sending interactions...");
 
     try {
-        const response = await fetch("http://localhost:9090/api/interactions/send-from-file", {
-            method: "POST"
-        });
+        const response = await fetch("http://localhost:9090/api/interactions/send-from-file", { method: "POST" });
 
         if (!response.ok) {
             throw new Error(`Server returned status: ${response.status}`);
@@ -215,11 +210,16 @@ document.getElementById("sendInteractionsButton").addEventListener("click", asyn
     }
 });
 
+// ✅ Ensure Apply Filter Button Works
+document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("applyFilterButton").addEventListener("click", applyFilter);
+});
+
+
 // ✅ Auto-refresh every 5 seconds
 document.addEventListener("DOMContentLoaded", function () {
     loadInteractions();
     setInterval(loadInteractions, 5000);
 
     document.getElementById("refreshButton").addEventListener("click", loadInteractions);
-    document.getElementById("applyFilterButton").addEventListener("click", applyFilter);
 });
