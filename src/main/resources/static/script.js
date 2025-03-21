@@ -4,6 +4,57 @@ let allData = []; // Store all interaction data globally
 let filteredData = []; // Store filtered data
 let apiHitCount = 0; // Counter to track API hits
 
+// ✅ Calculate Gini Coefficient
+function calculateGiniCoefficient(data) {
+    const actions = data.map(interaction => interaction.actionCount || 1); // Use actionCount
+    const n = actions.length;
+    if (n === 0) return 0;
+
+    const sortedActions = actions.sort((a, b) => a - b);
+    const sumActions = sortedActions.reduce((acc, val) => acc + val, 0);
+    const meanActions = sumActions / n;
+
+    let giniSum = 0;
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            giniSum += Math.abs(sortedActions[i] - sortedActions[j]);
+        }
+    }
+
+    const gini = giniSum / (2 * n * n * meanActions);
+    return gini;
+}
+
+// ✅ Update Statistics
+function updateStats() {
+    // Calculate actionCount for each user
+    const userActionCounts = {};
+    filteredData.forEach(interaction => {
+        const user = interaction.userName;
+        userActionCounts[user] = (userActionCounts[user] || 0) + 1;
+    });
+
+    // Add actionCount to each interaction
+    filteredData = filteredData.map(interaction => ({
+        ...interaction,
+        actionCount: userActionCounts[interaction.userName]
+    }));
+
+    const totalActions = filteredData.length;
+    const userSet = new Set(filteredData.map(interaction => interaction.userName));
+
+    // Calculate Gini Coefficient
+    const gini = calculateGiniCoefficient(filteredData);
+    const giniPercentage = (gini * 100).toFixed(2); // Convert to percentage
+
+    document.getElementById("totalActions").textContent = totalActions;
+    document.getElementById("totalUsers").textContent = userSet.size;
+    document.getElementById("usersWithActions").textContent = userSet.size;
+    document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
+    document.getElementById("giniPercentage").textContent = `${giniPercentage}%`; // Display Gini Percentage
+    document.getElementById("apiHitCount").textContent = apiHitCount; // Update API hit count
+}
+
 // ✅ Load Interactions from API
 async function loadInteractions() {
     apiHitCount++; // Increment the counter
@@ -115,8 +166,7 @@ function updateTable() {
 
 // ✅ Redirect to User Page Details
 function redirectToDetails(user, page) {
-    const url = `user-page-details.html?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`;
-    window.open(url, "_blank"); // Opens in a new tab
+    window.location.href = `user-page-details.html?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`;
 }
 
 // ✅ Update Pagination Buttons
@@ -139,18 +189,6 @@ document.getElementById("nextPage").addEventListener("click", () => {
         updateTable();
     }
 });
-
-// ✅ Update Statistics
-function updateStats() {
-    const totalActions = filteredData.length;
-    const userSet = new Set(filteredData.map(interaction => interaction.userName));
-
-    document.getElementById("totalActions").textContent = totalActions;
-    document.getElementById("totalUsers").textContent = userSet.size;
-    document.getElementById("usersWithActions").textContent = userSet.size;
-    document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
-    document.getElementById("apiHitCount").textContent = apiHitCount; // Update API hit count
-}
 
 // ✅ Update Charts
 function updateCharts() {
