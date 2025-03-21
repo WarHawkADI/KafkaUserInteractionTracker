@@ -27,14 +27,21 @@ body {
     text-align: center;
 }
 
-/* Heading */
-h2 {
+/* Stats Boxes */
+.stats {
+    display: flex;
+    justify-content: space-between;
     margin-bottom: 20px;
-    font-size: 24px;
-    font-weight: bold;
 }
 
-/* Button styles */
+.stat-box {
+    background: #444466;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+/* Buttons */
 .button-group {
     display: flex;
     justify-content: center;
@@ -46,11 +53,11 @@ button {
     background-color: #444466;
     color: white;
     border: none;
-    padding: 10px 15px;
-    border-radius: 5px;
+    padding: 12px 18px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
-    transition: 0.3s ease-in-out;
+    transition: 0.3s;
 }
 
 button:hover {
@@ -65,10 +72,11 @@ button.primary:hover {
     background-color: #0056b3;
 }
 
-/* Table styling */
+/* Table */
 .table-container {
     overflow-x: auto;
-    max-height: 400px;
+    max-height: 350px;
+    margin-bottom: 10px;
 }
 
 table {
@@ -80,38 +88,43 @@ table {
     overflow: hidden;
 }
 
-thead {
-    background-color: #444466;
-}
-
 th, td {
-    padding: 12px;
+    padding: 10px;
     text-align: left;
     border-bottom: 1px solid #444;
 }
 
 th {
     font-weight: bold;
-    text-transform: uppercase;
+    background: #333355;
 }
 
-tr:hover {
-    background-color: #3a3a5c;
+/* Pagination */
+.pagination {
+    margin: 10px 0;
 }
 
-/* Charts section */
-.charts {
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    margin-top: 20px;
+.pagination button {
+    background: #444466;
+    border: none;
+    padding: 8px 12px;
+    margin: 0 5px;
+    cursor: pointer;
+    color: white;
+    border-radius: 4px;
 }
 
-canvas {
-    width: 100%;
-    max-width: 400px;
-    height: auto;
-    background: white;
-    padding: 10px;
-    border-radius: 5px;
+.pagination button:hover {
+    background: #57578a;
+}
+
+.pagination button:disabled {
+    background: #333;
+    cursor: not-allowed;
+}
+
+/* Chart */
+.chart-container {
+    height: 250px;
+    margin-top: 10px;
 }

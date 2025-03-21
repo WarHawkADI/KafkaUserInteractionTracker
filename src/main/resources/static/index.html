@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Interaction Dashboard</title>
+    <title>Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -11,6 +11,13 @@
 
 <div class="container">
     <h2>User Interactions Dashboard</h2>
+
+    <div class="stats">
+        <div class="stat-box">Total Actions: <span id="totalActions">0</span></div>
+        <div class="stat-box">Total Users: <span id="totalUsers">0</span></div>
+        <div class="stat-box">Users with Actions: <span id="usersWithActions">0</span></div>
+        <div class="stat-box">Actions per User: <span id="actionsPerUser">0</span></div>
+    </div>
 
     <div class="button-group">
         <button id="refreshButton">Refresh Data</button>
@@ -35,9 +42,17 @@
         </table>
     </div>
 
-    <div class="charts">
-        <canvas id="roleChart"></canvas>
+    <div id="pagination" class="pagination">
+        <button id="prevPage">Previous</button>
+        <button id="nextPage">Next</button>
+    </div>
+
+    <div class="chart-container">
         <canvas id="actionChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="dailyActionChart"></canvas> <!-- NEW CHART -->
     </div>
 </div>
 
