@@ -76,6 +76,7 @@ button.primary:hover {
 .table-container {
     overflow-x: auto;
     max-height: 350px;
+    margin-bottom: 10px;
 }
 
 table {
@@ -95,10 +96,35 @@ th, td {
 
 th {
     font-weight: bold;
+    background: #333355;
+}
+
+/* Pagination */
+.pagination {
+    margin: 10px 0;
+}
+
+.pagination button {
+    background: #444466;
+    border: none;
+    padding: 8px 12px;
+    margin: 0 5px;
+    cursor: pointer;
+    color: white;
+    border-radius: 4px;
+}
+
+.pagination button:hover {
+    background: #57578a;
+}
+
+.pagination button:disabled {
+    background: #333;
+    cursor: not-allowed;
 }
 
 /* Chart */
 .chart-container {
-    margin-top: 20px;
-    height: 300px;
+    height: 250px;
+    margin-top: 10px;
 }
