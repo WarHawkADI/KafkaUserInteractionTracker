@@ -5,161 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Interaction Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-        }
-        button {
-            padding: 12px 20px;
-            font-size: 16px;
-            border: none;
-            cursor: pointer;
-            background: #007bff;
-            color: white;
-            border-radius: 5px;
-            transition: 0.3s;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 20px auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        table, th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-        }
-        th {
-            background: #007bff;
-            color: white;
-        }
-        canvas {
-            max-width: 90%;
-            margin-top: 20px;
-        }
-    </style>
-    <script>
-        async function sendInteractionsFromFile() {
-            try {
-                const response = await fetch("http://localhost:9090/api/interactions/send-from-file", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" }
-                });
-
-                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-                const data = await response.text();
-                alert(`✅ Success: ${data}`);
-            } catch (error) {
-                console.error("❌ Error:", error);
-                alert(`❌ Failed to send interactions:\n${error.message}`);
-            }
-        }
-
-        async function loadInteractions() {
-            try {
-                const response = await fetch("http://localhost:9090/api/interactions"); // Adjust API URL
-                const data = await response.json();
-
-                // Update Table
-                const tableBody = document.getElementById("tableBody");
-                tableBody.innerHTML = "";
-                data.forEach((interaction, index) => {
-                    let row = `<tr>
-                        <td>${index + 1}</td>
-                        <td>${interaction.userName}</td>
-                        <td>${interaction.userRole}</td>
-                        <td>${interaction.actionType}</td>
-                        <td>${interaction.pageName}</td>
-                        <td>${interaction.timestamp}</td>
-                    </tr>`;
-                    tableBody.innerHTML += row;
-                });
-
-                // Prepare Chart Data
-                const roleCounts = {};
-                const actionCounts = {};
-                data.forEach(interaction => {
-                    roleCounts[interaction.userRole] = (roleCounts[interaction.userRole] || 0) + 1;
-                    actionCounts[interaction.actionType] = (actionCounts[interaction.actionType] || 0) + 1;
-                });
-
-                // Bar Chart - User Roles
-                new Chart(document.getElementById("roleChart"), {
-                    type: "bar",
-                    data: {
-                        labels: Object.keys(roleCounts),
-                        datasets: [{ label: "User Roles", data: Object.values(roleCounts), backgroundColor: "#007bff" }]
-                    }
-                });
-
-                // Pie Chart - Action Types
-                new Chart(document.getElementById("actionChart"), {
-                    type: "pie",
-                    data: {
-                        labels: Object.keys(actionCounts),
-                        datasets: [{ data: Object.values(actionCounts), backgroundColor: ["#ff6384", "#36a2eb", "#ffce56", "#4caf50"] }]
-                    }
-                });
-
-            } catch (error) {
-                console.error("❌ Error loading interactions:", error);
-            }
-        }
-
-        window.onload = loadInteractions;
-    </script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<h1>📊 User Interaction Dashboard</h1>
-<button onclick="sendInteractionsFromFile()">📤 Send Interactions from File</button>
-<button onclick="loadInteractions()">🔄 Refresh Data</button>
 
 <div class="container">
-    <h2>📝 Interaction Logs</h2>
-    <table>
-        <thead>
-        <tr>
-            <th>#</th>
-            <th>User</th>
-            <th>Role</th>
-            <th>Action</th>
-            <th>Page</th>
-            <th>Timestamp</th>
-        </tr>
-        </thead>
-        <tbody id="tableBody">
-        <tr><td colspan="6">Loading...</td></tr>
-        </tbody>
-    </table>
+    <h2>User Interactions Dashboard</h2>
+
+    <div class="button-group">
+        <button id="refreshButton">Refresh Data</button>
+        <button id="sendInteractionsButton" class="primary">Send Interactions</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>User Name</th>
+                <th>Role</th>
+                <th>Action</th>
+                <th>Page</th>
+                <th>Timestamp</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <tr><td colspan="6">No data loaded yet...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="charts">
+        <canvas id="roleChart"></canvas>
+        <canvas id="actionChart"></canvas>
+    </div>
 </div>
 
-<div class="container">
-    <h2>📈 User Roles Distribution</h2>
-    <canvas id="roleChart"></canvas>
-</div>
+<script src="script.js"></script>
 
-<div class="container">
-    <h2>📊 Action Type Distribution</h2>
-    <canvas id="actionChart"></canvas>
-</div>
 </body>
 </html>

@@ -10,9 +10,15 @@ import org.springframework.stereotype.Service;
 public class KafkaConsumerService {
 
     private static final Logger logger = LoggerFactory.getLogger(KafkaConsumerService.class);
+    private final UserInteractionService interactionService;
+
+    public KafkaConsumerService(UserInteractionService interactionService) {
+        this.interactionService = interactionService;
+    }
 
     @KafkaListener(topics = "user-interactions", groupId = "user-group", containerFactory = "userKafkaListenerFactory")
     public void consume(UserInteractionDTO interaction) {
         logger.info("✅ Received Kafka Message: {}", interaction);
+        interactionService.storeInteraction(interaction); // Store in memory
     }
 }
