@@ -1,14 +1,18 @@
 package com.example.userinteraction.service;
 
 import com.example.userinteraction.model.UserInteractionDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
 @Service
 public class KafkaConsumerService {
 
-    @KafkaListener(topics = "user_interactions", groupId = "user-interaction-group", containerFactory = "userKafkaListenerFactory")
-    public void consume(UserInteractionDTO userInteraction) {
-        System.out.println("Received Message: " + userInteraction);
+    private static final Logger logger = LoggerFactory.getLogger(KafkaConsumerService.class);
+
+    @KafkaListener(topics = "user-interactions", groupId = "user-group", containerFactory = "userKafkaListenerFactory")
+    public void consume(UserInteractionDTO interaction) {
+        logger.info("✅ Received Kafka Message: {}", interaction);
     }
 }

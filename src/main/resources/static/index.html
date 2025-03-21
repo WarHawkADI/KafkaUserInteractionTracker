@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Interaction System</title>
+    <style>
+        /* Google Font */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+        /* Modern Page Styling */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #1E1E2F, #3A3A58);
+            color: #fff;
+            text-align: center;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        /* Button Styling */
+        .btn {
+            background: linear-gradient(90deg, #FF416C, #FF4B2B);
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            outline: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0px 4px 15px rgba(255, 75, 43, 0.5);
+        }
+
+        .btn:hover {
+            background: linear-gradient(90deg, #FF4B2B, #FF416C);
+            transform: scale(1.05);
+        }
+
+        /* Loading Effect */
+        .btn.loading {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        .btn.loading::after {
+            content: "⏳ Sending...";
+        }
+
+        .btn:not(.loading)::after {
+            content: "📤 Send Interactions";
+        }
+
+        /* Success & Error Popups */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #28a745;
+            color: #fff;
+            padding: 15px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            display: none;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        .toast.error {
+            background: #dc3545;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+        }
+    </style>
+    <script>
+        async function sendInteractionsFromFile() {
+            const button = document.getElementById("sendBtn");
+            button.classList.add("loading");
+            button.disabled = true;
+
+            try {
+                const response = await fetch("http://localhost:9090/api/interactions/send-from-file", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.text();
+                showToast(`✅ Success: ${data}`, "success");
+            } catch (error) {
+                console.error("❌ Error:", error);
+                showToast(`❌ Failed: ${error.message}`, "error");
+            } finally {
+                button.classList.remove("loading");
+                button.disabled = false;
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement("div");
+            toast.className = `toast ${type === "error" ? "error" : ""}`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            toast.style.display = "block";
+
+            setTimeout(() => {
+                toast.style.display = "none";
+                document.body.removeChild(toast);
+            }, 3000);
+        }
+    </script>
+</head>
+<body>
+
+<h1>🚀 User Interaction System</h1>
+<button id="sendBtn" class="btn" onclick="sendInteractionsFromFile()"></button>
+
+</body>
+</html>

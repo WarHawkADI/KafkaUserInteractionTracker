@@ -1,13 +1,14 @@
 package com.example.userinteraction;
 
 import org.junit.jupiter.api.Test;
+
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class SpringBootUserInteractionApplicationTests {
 
     @Test
-    void contextLoads ( ) {
+    void contextLoads() {
+        // Ensure that the application context loads without errors
     }
-
 }

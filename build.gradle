@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.3.10-SNAPSHOT'
+    id 'org.springframework.boot' version '3.2.2' // Use stable version
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -26,9 +26,15 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.projectlombok:lombok'
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
+
     annotationProcessor 'org.projectlombok:lombok'
 }
 
