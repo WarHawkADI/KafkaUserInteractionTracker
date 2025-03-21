@@ -32,6 +32,7 @@ body {
     display: flex;
     justify-content: space-between;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
 .stat-box {
@@ -39,6 +40,9 @@ body {
     padding: 10px;
     border-radius: 5px;
     font-size: 14px;
+    flex: 1;
+    margin: 5px;
+    text-align: center;
 }
 
 /* Buttons */
@@ -70,6 +74,42 @@ button.primary {
 
 button.primary:hover {
     background-color: #0056b3;
+}
+
+/* ✅ Filters */
+.filter-group {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-group label {
+    font-size: 14px;
+}
+
+.filter-group select {
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+    background: #333355;
+    color: white;
+    font-size: 14px;
+}
+
+#applyFilterButton {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#applyFilterButton:hover {
+    background-color: #218838;
 }
 
 /* Table */

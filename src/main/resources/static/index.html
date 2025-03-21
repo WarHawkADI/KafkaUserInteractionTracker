@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <title> </title>
-
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="styles.css">
@@ -25,6 +23,31 @@
     <div class="button-group">
         <button id="refreshButton">Refresh Data</button>
         <button id="sendInteractionsButton" class="primary">Send Interactions</button>
+    </div>
+
+    <!-- ✅ Filters Section with "Apply Filter" Button -->
+    <div class="filter-group">
+        <label for="userFilter">User:</label>
+        <select id="userFilter">
+            <option value="">All Users</option>
+        </select>
+
+        <label for="actionFilter">Action:</label>
+        <select id="actionFilter">
+            <option value="">All Actions</option>
+        </select>
+
+        <label for="roleFilter">Role:</label>
+        <select id="roleFilter">
+            <option value="">All Roles</option>
+        </select>
+
+        <label for="pageFilter">Page:</label>
+        <select id="pageFilter">
+            <option value="">All Pages</option>
+        </select>
+
+        <button id="applyFilterButton">Apply Filter</button>
     </div>
 
     <div class="table-container">
@@ -55,7 +78,7 @@
     </div>
 
     <div class="chart-container">
-        <canvas id="dailyActionChart"></canvas> <!-- NEW CHART -->
+        <canvas id="dailyActionChart"></canvas>
     </div>
 </div>
 

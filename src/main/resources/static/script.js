@@ -1,6 +1,7 @@
 let currentPage = 1;
-const rowsPerPage = 5   ;
+const rowsPerPage = 5;
 let allData = []; // Store all interaction data globally
+let filteredData = []; // Store filtered data
 
 async function loadInteractions() {
     console.log("Fetching latest interactions...");
@@ -12,18 +13,65 @@ async function loadInteractions() {
             throw new Error(`Server returned status: ${response.status}`);
         }
 
-        const data = await response.json();
-        console.log("Data received:", data);
-        allData = data; // Store data globally for pagination
+        allData = await response.json();
+        console.log("Data received:", allData);
 
-        updateTable();
-        updateStats(); // ✅ Now defined
-        updateCharts(); // ✅ Now defined
-
+        populateFilterOptions();
+        applyFilter(); // Apply the current filters after loading data
     } catch (error) {
         console.error("Error loading interactions:", error);
         alert(`Failed to load interactions: ${error.message}`);
     }
+}
+
+// ✅ Populate Filter Options (User, Action, Role, Page)
+function populateFilterOptions() {
+    const userFilter = document.getElementById("userFilter");
+    const actionFilter = document.getElementById("actionFilter");
+    const roleFilter = document.getElementById("roleFilter");
+    const pageFilter = document.getElementById("pageFilter");
+
+    userFilter.innerHTML = `<option value="">All Users</option>`;
+    actionFilter.innerHTML = `<option value="">All Actions</option>`;
+    roleFilter.innerHTML = `<option value="">All Roles</option>`;
+    pageFilter.innerHTML = `<option value="">All Pages</option>`;
+
+    const users = new Set();
+    const actions = new Set();
+    const roles = new Set();
+    const pages = new Set();
+
+    allData.forEach(interaction => {
+        users.add(interaction.userName);
+        actions.add(interaction.actionType);
+        roles.add(interaction.userRole);
+        pages.add(interaction.pageName);
+    });
+
+    users.forEach(user => userFilter.innerHTML += `<option value="${user}">${user}</option>`);
+    actions.forEach(action => actionFilter.innerHTML += `<option value="${action}">${action}</option>`);
+    roles.forEach(role => roleFilter.innerHTML += `<option value="${role}">${role}</option>`);
+    pages.forEach(page => pageFilter.innerHTML += `<option value="${page}">${page}</option>`);
+}
+
+// ✅ Apply Filter
+function applyFilter() {
+    const selectedUser = document.getElementById("userFilter").value;
+    const selectedAction = document.getElementById("actionFilter").value;
+    const selectedRole = document.getElementById("roleFilter").value;
+    const selectedPage = document.getElementById("pageFilter").value;
+
+    filteredData = allData.filter(interaction =>
+        (selectedUser === "" || interaction.userName === selectedUser) &&
+        (selectedAction === "" || interaction.actionType === selectedAction) &&
+        (selectedRole === "" || interaction.userRole === selectedRole) &&
+        (selectedPage === "" || interaction.pageName === selectedPage)
+    );
+
+    currentPage = 1; // Reset pagination to the first page
+    updateTable();
+    updateStats();
+    updateCharts();
 }
 
 // ✅ Update Table with Pagination
@@ -31,14 +79,14 @@ function updateTable() {
     const tableBody = document.getElementById("tableBody");
     tableBody.innerHTML = "";
 
-    if (allData.length === 0) {
+    if (filteredData.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="6">No interactions found.</td></tr>`;
         return;
     }
 
     const start = (currentPage - 1) * rowsPerPage;
-    const end = Math.min(start + rowsPerPage, allData.length);
-    const pageData = allData.slice(start, end);
+    const end = Math.min(start + rowsPerPage, filteredData.length);
+    const pageData = filteredData.slice(start, end);
 
     pageData.forEach((interaction, index) => {
         let row = `<tr>
@@ -58,7 +106,7 @@ function updateTable() {
 // ✅ Update Pagination Buttons
 function updatePaginationButtons() {
     document.getElementById("prevPage").disabled = currentPage === 1;
-    document.getElementById("nextPage").disabled = currentPage * rowsPerPage >= allData.length;
+    document.getElementById("nextPage").disabled = currentPage * rowsPerPage >= filteredData.length;
 }
 
 document.getElementById("prevPage").addEventListener("click", () => {
@@ -69,7 +117,7 @@ document.getElementById("prevPage").addEventListener("click", () => {
 });
 
 document.getElementById("nextPage").addEventListener("click", () => {
-    if (currentPage * rowsPerPage < allData.length) {
+    if (currentPage * rowsPerPage < filteredData.length) {
         currentPage++;
         updateTable();
     }
@@ -77,8 +125,8 @@ document.getElementById("nextPage").addEventListener("click", () => {
 
 // ✅ Update Statistics
 function updateStats() {
-    const totalActions = allData.length;
-    const userSet = new Set(allData.map(interaction => interaction.userName));
+    const totalActions = filteredData.length;
+    const userSet = new Set(filteredData.map(interaction => interaction.userName));
 
     document.getElementById("totalActions").textContent = totalActions;
     document.getElementById("totalUsers").textContent = userSet.size;
@@ -91,7 +139,7 @@ function updateCharts() {
     const actionCounts = {};
     const dailyActions = {};
 
-    allData.forEach(interaction => {
+    filteredData.forEach(interaction => {
         actionCounts[interaction.actionType] = (actionCounts[interaction.actionType] || 0) + 1;
 
         const date = interaction.timestamp.split("T")[0]; // Extract YYYY-MM-DD
@@ -146,7 +194,7 @@ function updateCharts() {
     });
 }
 
-// ✅ Send Interactions (Fixed JSON Issue)
+// ✅ Send Interactions
 document.getElementById("sendInteractionsButton").addEventListener("click", async function () {
     console.log("Sending interactions...");
 
@@ -159,16 +207,7 @@ document.getElementById("sendInteractionsButton").addEventListener("click", asyn
             throw new Error(`Server returned status: ${response.status}`);
         }
 
-        let message;
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            const data = await response.json();
-            message = data.message || "Interactions sent successfully!";
-        } else {
-            message = "Interactions sent successfully!";
-        }
-
-        alert(message);
+        alert("Interactions sent successfully!");
         loadInteractions();
     } catch (error) {
         console.error("Error sending interactions:", error);
@@ -182,4 +221,5 @@ document.addEventListener("DOMContentLoaded", function () {
     setInterval(loadInteractions, 5000);
 
     document.getElementById("refreshButton").addEventListener("click", loadInteractions);
+    document.getElementById("applyFilterButton").addEventListener("click", applyFilter);
 });
