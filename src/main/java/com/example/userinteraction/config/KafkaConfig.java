@@ -18,7 +18,7 @@ import java.util.Map;
 @Configuration
 public class KafkaConfig {
 
-    // ✅ Producer Factory - Produces UserInteractionDTO messages
+    // Produces UserInteractionDTO messages
     @Bean
     public ProducerFactory<String, UserInteractionDTO> producerFactory() {
         Map<String, Object> config = new HashMap<>();
@@ -28,13 +28,13 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(config);
     }
 
-    // ✅ Kafka Template - Sends UserInteractionDTO messages
+    // Sends UserInteractionDTO messages
     @Bean
     public KafkaTemplate<String, UserInteractionDTO> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
-    // ✅ Consumer Factory - Properly deserializes UserInteractionDTO
+    // Properly deserializes UserInteractionDTO
     @Bean
     public ConsumerFactory<String, UserInteractionDTO> consumerFactory() {
         Map<String, Object> config = new HashMap<>();
@@ -44,7 +44,7 @@ public class KafkaConfig {
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
 
-        // ✅ Correct JSON deserialization
+        // JSON deserialization
         JsonDeserializer<UserInteractionDTO> deserializer = new JsonDeserializer<>(UserInteractionDTO.class);
         deserializer.setRemoveTypeHeaders(false);
         deserializer.addTrustedPackages("*");
@@ -53,7 +53,7 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), deserializer);
     }
 
-    // ✅ Kafka Listener Factory
+    // Kafka Listener Factory
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, UserInteractionDTO> userKafkaListenerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, UserInteractionDTO> factory = new ConcurrentKafkaListenerContainerFactory<>();

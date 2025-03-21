@@ -27,7 +27,7 @@ public class KafkaController {
     @PostMapping("/send-from-file")
     public ResponseEntity<String> sendInteractionsWithDelay() {
         kafkaProducerService.sendInteractionsWithDelay();
-        return ResponseEntity.ok("✅ Sending interactions to Kafka at 5-second intervals...");
+        return ResponseEntity.ok("✅ Sending interactions to Kafka...");
     }
 
     /**
