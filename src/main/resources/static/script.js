@@ -2,9 +2,13 @@ let currentPage = 1;
 const rowsPerPage = 5;
 let allData = []; // Store all interaction data globally
 let filteredData = []; // Store filtered data
+let apiHitCount = 0; // Counter to track API hits
 
 // ✅ Load Interactions from API
 async function loadInteractions() {
+    apiHitCount++; // Increment the counter
+    console.log(`API hit count: ${apiHitCount}`); // Log the count (optional)
+
     console.log("Fetching latest interactions...");
 
     try {
@@ -77,6 +81,7 @@ function applyFilter() {
     updateTable();
     updateStats();
     updateCharts();
+    updatePageRankingChart(); // Update the new chart
 }
 
 // ✅ Update Table with Pagination
@@ -138,6 +143,7 @@ function updateStats() {
     document.getElementById("totalUsers").textContent = userSet.size;
     document.getElementById("usersWithActions").textContent = userSet.size;
     document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
+    document.getElementById("apiHitCount").textContent = apiHitCount; // Update API hit count
 }
 
 // ✅ Update Charts
@@ -191,6 +197,79 @@ function updateCharts() {
     });
 }
 
+// ✅ Update Page Ranking Chart
+function updatePageRankingChart() {
+    const pageCounts = {};
+
+    // Count actions by page
+    filteredData.forEach(interaction => {
+        const page = interaction.pageName || "Unknown Page";
+        pageCounts[page] = (pageCounts[page] || 0) + 1;
+    });
+
+    // Sort pages by action count (descending)
+    const sortedPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
+    const topPages = sortedPages.slice(0, 5); // Get top 5 pages
+
+    // Extract labels and data for the chart
+    const labels = topPages.map(([page]) => page);
+    const data = topPages.map(([, count]) => count);
+
+    // Destroy existing chart instance if it exists
+    if (window.pageRankingChartInstance) {
+        window.pageRankingChartInstance.destroy();
+    }
+
+    // Create the chart
+    const ctx = document.getElementById("pageRankingChart").getContext("2d");
+    window.pageRankingChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Actions",
+                data: data,
+                backgroundColor: "#007bff", // Blue bars
+                borderColor: "#0056b3",
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: "y", // Horizontal bar chart
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false // Hide legend
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const rank = context.dataIndex + 1; // Calculate rank
+                            return `Rank ${rank}: ${context.raw} actions`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "Number of Actions"
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: "Page"
+                    }
+                }
+            }
+        }
+    });
+}
+
 // ✅ Send Interactions
 document.getElementById("sendInteractionsButton").addEventListener("click", async function () {
     console.log("Sending interactions...");
@@ -214,7 +293,6 @@ document.getElementById("sendInteractionsButton").addEventListener("click", asyn
 document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("applyFilterButton").addEventListener("click", applyFilter);
 });
-
 
 // ✅ Auto-refresh every 5 seconds
 document.addEventListener("DOMContentLoaded", function () {
