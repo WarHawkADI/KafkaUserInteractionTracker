@@ -1,48 +1,53 @@
-/* Reset default browser styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "Arial", sans-serif;
-}
-
-/* Dark background with contrast */
+/* General Styling */
 body {
-    background-color: #1e1e2f;
+    font-family: Arial, sans-serif;
+    background-color: #1e1e2e;
     color: #ffffff;
+    margin: 0;
+    padding: 20px;
     display: flex;
     justify-content: center;
-    align-items: center;
-    min-height: 100vh;
 }
 
-/* Main container */
 .container {
     width: 90%;
-    max-width: 1000px;
+    max-width: 1200px;
+    background-color: #2a2a3b;
     padding: 20px;
-    background: #252540;
     border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    text-align: center;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-/* Stats Boxes */
+/* Header */
+h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Stats Section */
 .stats {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
+    justify-content: space-around;
     flex-wrap: wrap;
+    margin-bottom: 20px;
 }
 
 .stat-box {
-    background: #444466;
-    padding: 10px;
-    border-radius: 5px;
-    font-size: 14px;
+    background-color: #33334d;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 18px;
+    text-align: center;
     flex: 1;
     margin: 5px;
-    text-align: center;
+    min-width: 150px;
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Hover Effect */
+.stat-box:hover {
+    transform: scale(1.05);
+    background-color: #444466;
 }
 
 /* Buttons */
@@ -54,117 +59,111 @@ body {
 }
 
 button {
-    background-color: #444466;
-    color: white;
+    padding: 10px 15px;
     border: none;
-    padding: 12px 18px;
-    border-radius: 6px;
     cursor: pointer;
-    font-size: 14px;
-    transition: 0.3s;
+    font-size: 16px;
+    border-radius: 5px;
+    transition: background 0.3s ease-in-out;
 }
 
+#refreshButton {
+    background-color: gray;
+    color: white;
+}
+
+#sendInteractionsButton {
+    background-color: blue;
+    color: white;
+}
+
+#applyFilter {
+    background-color: green;
+    color: white;
+}
+
+/* Hover Effects */
 button:hover {
-    background-color: #57578a;
+    opacity: 0.8;
 }
 
-button.primary {
-    background-color: #007bff;
-}
-
-button.primary:hover {
-    background-color: #0056b3;
-}
-
-/* ✅ Filters */
+/* Filters */
 .filter-group {
     display: flex;
     justify-content: center;
     gap: 10px;
-    margin-bottom: 20px;
     flex-wrap: wrap;
     align-items: center;
+    margin-bottom: 20px;
 }
 
-.filter-group label {
-    font-size: 14px;
+label {
+    font-weight: bold;
 }
 
-.filter-group select {
+.select-container {
+    position: relative;
+}
+
+select {
     padding: 8px;
-    border: none;
     border-radius: 5px;
-    background: #333355;
-    color: white;
-    font-size: 14px;
-}
-
-#applyFilterButton {
-    background-color: #28a745;
-    color: white;
-    padding: 10px 15px;
-    border-radius: 6px;
+    border: 1px solid #ccc;
     cursor: pointer;
-    transition: 0.3s;
-}
-
-#applyFilterButton:hover {
-    background-color: #218838;
+    font-size: 14px;
 }
 
 /* Table */
 .table-container {
     overflow-x: auto;
-    max-height: 350px;
-    margin-bottom: 10px;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
-    background: #2e2e50;
-    border-radius: 5px;
+    margin-bottom: 20px;
+    background-color: #3a3a4d;
+    border-radius: 8px;
     overflow: hidden;
+}
+
+thead {
+    background-color: #555577;
+    color: white;
+    position: sticky;
+    top: 0;
 }
 
 th, td {
     padding: 10px;
-    text-align: left;
+    text-align: center;
     border-bottom: 1px solid #444;
 }
 
-th {
-    font-weight: bold;
-    background: #333355;
+tbody tr:hover {
+    background-color: #4a4a66;
+    cursor: pointer;
 }
 
 /* Pagination */
 .pagination {
-    margin: 10px 0;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
 .pagination button {
-    background: #444466;
-    border: none;
-    padding: 8px 12px;
-    margin: 0 5px;
-    cursor: pointer;
+    background-color: #555;
     color: white;
-    border-radius: 4px;
 }
 
-.pagination button:hover {
-    background: #57578a;
-}
-
-.pagination button:disabled {
-    background: #333;
-    cursor: not-allowed;
-}
-
-/* Chart */
+/* Charts */
 .chart-container {
-    height: 250px;
-    margin-top: 10px;
+    background-color: #29293d;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
+
+/* Checking push done or not */

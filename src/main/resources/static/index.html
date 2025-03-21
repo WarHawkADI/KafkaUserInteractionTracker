@@ -13,6 +13,7 @@
 <div class="container">
     <h2>User Interactions Dashboard</h2>
 
+    <!-- Animated Stats -->
     <div class="stats">
         <div class="stat-box">Total Actions: <span id="totalActions">0</span></div>
         <div class="stat-box">Total Users: <span id="totalUsers">0</span></div>
@@ -20,36 +21,47 @@
         <div class="stat-box">Actions per User: <span id="actionsPerUser">0</span></div>
     </div>
 
+    <!-- Buttons -->
     <div class="button-group">
         <button id="refreshButton">Refresh Data</button>
-        <button id="sendInteractionsButton" class="primary">Send Interactions</button>
+        <button id="sendInteractionsButton">Send Interactions</button>
     </div>
 
-    <!-- ✅ Filters Section with "Apply Filter" Button -->
+    <!-- Filters -->
     <div class="filter-group">
-        <label for="userFilter">User:</label>
-        <select id="userFilter">
-            <option value="">All Users</option>
-        </select>
+        <label>User:</label>
+        <div class="select-container">
+            <select id="userFilter">
+                <option value="">All Users</option>
+            </select>
+        </div>
 
-        <label for="actionFilter">Action:</label>
-        <select id="actionFilter">
-            <option value="">All Actions</option>
-        </select>
+        <label>Action:</label>
+        <div class="select-container">
+            <select id="actionFilter">
+                <option value="">All Actions</option>
+            </select>
+        </div>
 
-        <label for="roleFilter">Role:</label>
-        <select id="roleFilter">
-            <option value="">All Roles</option>
-        </select>
+        <label>Role:</label>
+        <div class="select-container">
+            <select id="roleFilter">
+                <option value="">All Roles</option>
+            </select>
+        </div>
 
-        <label for="pageFilter">Page:</label>
-        <select id="pageFilter">
-            <option value="">All Pages</option>
-        </select>
+        <label>Page:</label>
+        <div class="select-container">
+            <select id="pageFilter">
+                <option value="">All Pages</option>
+            </select>
+        </div>
 
         <button id="applyFilterButton">Apply Filter</button>
+
     </div>
 
+    <!-- Table -->
     <div class="table-container">
         <table>
             <thead>
@@ -68,11 +80,13 @@
         </table>
     </div>
 
+    <!-- Pagination -->
     <div id="pagination" class="pagination">
         <button id="prevPage">Previous</button>
         <button id="nextPage">Next</button>
     </div>
 
+    <!-- Charts -->
     <div class="chart-container">
         <canvas id="actionChart"></canvas>
     </div>
