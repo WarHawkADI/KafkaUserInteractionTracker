@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Page Details</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+    <h2 id="pageTitle">User Page Details</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Action Type</th>
+                <th>Details</th>
+                <th>Timestamp</th>
+            </tr>
+            </thead>
+            <tbody id="detailsTableBody">
+            <tr><td colspan="4">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Extract user and page from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const user = urlParams.get("user");
+    const page = urlParams.get("page");
+
+    // Set the page title
+    document.getElementById("pageTitle").textContent = `Details for ${user} on ${page}`;
+
+    // Fetch and display granular details
+    async function loadDetails() {
+        try {
+            // Fetch granular details from the API
+            const response = await fetch(`http://localhost:9090/api/interactions/details?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`);
+            if (!response.ok) {
+                throw new Error(`Server returned status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const tableBody = document.getElementById("detailsTableBody");
+            tableBody.innerHTML = "";
+
+            if (data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4">No granular details found for ${user} on ${page}.</td></tr>`;
+                return;
+            }
+
+            // Populate the table with granular details
+            data.forEach((detail, index) => {
+                let row = `<tr>
+                    <td>${index + 1}</td>
+                    <td>${detail.actionType || "N/A"}</td>
+                    <td>${detail.details || "N/A"}</td>
+                    <td>${detail.timestamp || "N/A"}</td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error("Error loading details:", error);
+            alert(`Failed to load details: ${error.message}`);
+        }
+    }
+
+    // Load details when the page loads
+    document.addEventListener("DOMContentLoaded", loadDetails);
+</script>
+</body>
+</html>

@@ -104,7 +104,7 @@ function updateTable() {
             <td>${interaction.userName || "N/A"}</td>
             <td>${interaction.userRole || "N/A"}</td>
             <td>${interaction.actionType || "N/A"}</td>
-            <td>${interaction.pageName || "N/A"}</td>
+            <td><a href="user-page-details.html?user=${encodeURIComponent(interaction.userName)}&page=${encodeURIComponent(interaction.pageName)}" target="_blank">${interaction.pageName || "N/A"}</a></td>
             <td>${interaction.timestamp || "N/A"}</td>
         </tr>`;
         tableBody.innerHTML += row;
