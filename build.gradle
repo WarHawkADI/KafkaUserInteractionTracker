@@ -35,6 +35,11 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:2.0.9'
     implementation 'org.springframework.boot:spring-boot-starter-logging'
 
+
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'  // WebSocket
+    implementation 'org.springframework.kafka:spring-kafka'                  // Existing Kafka
+    implementation 'com.fasterxml.jackson.core:jackson-databind'             // Existing JSON
+
     annotationProcessor 'org.projectlombok:lombok'
 }
 
