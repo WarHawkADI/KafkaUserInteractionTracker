@@ -10,6 +10,7 @@ let isConnected = false;
 const maxReconnectAttempts = 5;
 let reconnectAttempts = 0;
 let reconnectInterval = null;
+let chartInstances = {};
 
 // WebSocket Functions
 function initWebSocket() {
@@ -73,8 +74,6 @@ function updateUI() {
     updateTable();
     updateStats();
     updateCharts();
-    updatePageRankingChart();
-    updateRolePieChart();
 }
 
 function handleReconnect() {
@@ -98,7 +97,21 @@ function clearReconnectAttempts() {
 
 function updateConnectionStatus(status) {
     const statusElement = document.getElementById('connectionStatus');
-    if (statusElement) {
+    if (!statusElement) {
+        // Create status element if it doesn't exist
+        const newStatusElement = document.createElement('div');
+        newStatusElement.id = 'connectionStatus';
+        newStatusElement.style.position = 'fixed';
+        newStatusElement.style.bottom = '10px';
+        newStatusElement.style.right = '10px';
+        newStatusElement.style.padding = '5px 10px';
+        newStatusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
+        newStatusElement.style.color = 'white';
+        newStatusElement.style.borderRadius = '5px';
+        newStatusElement.style.zIndex = '1000';
+        newStatusElement.textContent = status;
+        document.body.appendChild(newStatusElement);
+    } else {
         statusElement.textContent = status;
         statusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
     }
@@ -194,7 +207,7 @@ function updateTable() {
                     ${interaction.pageName || "N/A"}
                 </button>
             </td>
-            <td>${interaction.timestamp || "N/A"}</td>
+            <td>${new Date(interaction.timestamp).toLocaleString() || "N/A"}</td>
         </tr>
     `).join('');
 
@@ -262,7 +275,63 @@ function updateStats() {
 // Chart Functions
 function updateCharts() {
     updateChart('actionChart', 'bar', 'Actions Performed', "#007bff", 'actionType');
-    updateChart('dailyActionChart', 'line', 'Total Actions per Day', "#28a745", 'timestamp', true);
+    updateDailyActionChart();
+    updateRankingChart('pageRankingChart', 'pageName', 'Page');
+    updateRankingChart('rolePieChart', 'userRole', 'Role', 'pie');
+}
+
+function updateDailyActionChart() {
+    // Group by date and count actions
+    const dateCounts = {};
+    filteredData.forEach(interaction => {
+        const date = interaction.timestamp.split('T')[0];
+        dateCounts[date] = (dateCounts[date] || 0) + 1;
+    });
+
+    // Convert to array and sort by date
+    const sortedDates = Object.keys(dateCounts).sort((a, b) => new Date(a) - new Date(b));
+    const sortedCounts = sortedDates.map(date => dateCounts[date]);
+
+    // Destroy previous chart instance if exists
+    if (chartInstances['dailyActionChart']) {
+        chartInstances['dailyActionChart'].destroy();
+    }
+
+    const ctx = document.getElementById('dailyActionChart').getContext('2d');
+    chartInstances['dailyActionChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sortedDates,
+            datasets: [{
+                label: 'Total Actions per Day',
+                data: sortedCounts,
+                borderColor: "#28a745",
+                backgroundColor: "rgba(40, 167, 69, 0.1)",
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Actions'
+                    }
+                }
+            }
+        }
+    });
 }
 
 function updateChart(canvasId, type, label, color, property, isDate = false) {
@@ -272,12 +341,13 @@ function updateChart(canvasId, type, label, color, property, isDate = false) {
         counts[key] = (counts[key] || 0) + 1;
     });
 
-    if (window[`${canvasId}Instance`]) {
-        window[`${canvasId}Instance`].destroy();
+    // Destroy previous chart instance if exists
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
     }
 
     const ctx = document.getElementById(canvasId).getContext('2d');
-    window[`${canvasId}Instance`] = new Chart(ctx, {
+    chartInstances[canvasId] = new Chart(ctx, {
         type,
         data: {
             labels: Object.keys(counts),
@@ -297,14 +367,6 @@ function updateChart(canvasId, type, label, color, property, isDate = false) {
     });
 }
 
-function updatePageRankingChart() {
-    updateRankingChart('pageRankingChart', 'pageName', 'Page');
-}
-
-function updateRolePieChart() {
-    updateRankingChart('rolePieChart', 'userRole', 'Role', 'pie');
-}
-
 function updateRankingChart(canvasId, property, label, type = 'bar') {
     const counts = {};
     filteredData.forEach(interaction => {
@@ -315,12 +377,13 @@ function updateRankingChart(canvasId, property, label, type = 'bar') {
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const topItems = type === 'pie' ? sorted : sorted.slice(0, 5);
 
-    if (window[`${canvasId}Instance`]) {
-        window[`${canvasId}Instance`].destroy();
+    // Destroy previous chart instance if exists
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
     }
 
     const ctx = document.getElementById(canvasId).getContext('2d');
-    window[`${canvasId}Instance`] = new Chart(ctx, {
+    chartInstances[canvasId] = new Chart(ctx, {
         type,
         data: {
             labels: topItems.map(([key]) => key),
@@ -342,8 +405,7 @@ function updateRankingChart(canvasId, property, label, type = 'bar') {
             plugins: {
                 legend: {
                     display: type === 'pie',
-                    position: 'bottom',
-                    labels: { color: "#ffffff" }
+                    position: 'bottom'
                 },
                 tooltip: {
                     callbacks: {
@@ -405,43 +467,13 @@ function setupEventListeners() {
 
 // Initialization
 function initializeApp() {
-    // Add connection status element
-    const statusElement = document.createElement('div');
-    statusElement.id = 'connectionStatus';
-    Object.assign(statusElement.style, {
-        position: 'fixed',
-        bottom: '10px',
-        right: '10px',
-        padding: '5px 10px',
-        backgroundColor: '#333',
-        color: 'white',
-        borderRadius: '5px',
-        zIndex: '1000'
-    });
-    document.body.appendChild(statusElement);
-
-    // Load required scripts dynamically
-    if (typeof SockJS === 'undefined' || typeof Stomp === 'undefined') {
-        const loadScript = (src, callback) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = callback;
-            document.head.appendChild(script);
-        };
-
-        loadScript('https://cdn.jsdelivr.net/npm/sockjs-client@1.5.1/dist/sockjs.min.js', () => {
-            loadScript('https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js', () => {
-                setupEventListeners();
-                initWebSocket();
-                loadInteractions();
-            });
-        });
-    } else {
-        setupEventListeners();
-        initWebSocket();
-        loadInteractions();
-    }
+    setupEventListeners();
+    initWebSocket();
+    loadInteractions();
 }
 
 // Start the application
 document.addEventListener("DOMContentLoaded", initializeApp);
+
+// Make redirect function available globally
+window.redirectToDetails = redirectToDetails;
