@@ -12,9 +12,40 @@ let reconnectAttempts = 0;
 let reconnectInterval = null;
 let chartInstances = {};
 
+// Utility functions
+function formatDate(dateString) {
+    if (!dateString) return "N/A";
+    try {
+        const date = new Date(dateString);
+        return isNaN(date.getTime()) ? dateString : date.toLocaleString();
+    } catch (e) {
+        return dateString;
+    }
+}
+
+function extractDatePart(dateString) {
+    if (!dateString) return "Unknown";
+    // Handle both ISO format and "yyyy-MM-dd HH:mm:ss" format
+    const datePart = dateString.includes('T')
+        ? dateString.split('T')[0]
+        : dateString.split(' ')[0];
+    return datePart || "Unknown";
+}
+
+function normalizeInteraction(interaction) {
+    return {
+        ...interaction,
+        userName: interaction.userName || "Unknown",
+        userRole: interaction.userRole || "Unknown",
+        actionType: interaction.actionType || "Unknown",
+        pageName: interaction.pageName || "Unknown",
+        formattedCreatedAt: formatDate(interaction.createdAt),
+        datePart: extractDatePart(interaction.createdAt)
+    };
+}
+
 // WebSocket Functions
 function initWebSocket() {
-    // Create SockJS connection
     socket = new SockJS('http://localhost:9090/ws-interactions');
     stompClient = Stomp.over(socket);
 
@@ -24,10 +55,16 @@ function initWebSocket() {
         updateConnectionStatus('🟢 Connected');
         clearReconnectAttempts();
 
-        // Subscribe to interactions topic
         stompClient.subscribe('/topic/interactions', function(message) {
-            const newData = JSON.parse(message.body);
-            handleNewData(newData);
+            try {
+                const newData = JSON.parse(message.body);
+                if (!Array.isArray(newData)) {
+                    throw new Error('Received data is not an array');
+                }
+                handleNewData(newData);
+            } catch (e) {
+                console.error('Error processing WebSocket message:', e);
+            }
         });
     }, function(error) {
         console.error('WebSocket error:', error);
@@ -37,49 +74,10 @@ function initWebSocket() {
     });
 }
 
-function handleNewData(newData) {
-    // Save current filter values
-    const currentFilters = {
-        user: document.getElementById("userFilter").value,
-        action: document.getElementById("actionFilter").value,
-        role: document.getElementById("roleFilter").value,
-        page: document.getElementById("pageFilter").value
-    };
-
-    // Update allData with new data
-    allData = newData;
-
-    // Reapply filters
-    applyFilters(currentFilters);
-
-    // Update UI
-    updateUI();
-}
-
-function applyFilters({user, action, role, page}) {
-    filteredData = allData.filter(interaction =>
-        (user === "" || interaction.userName === user) &&
-        (action === "" || interaction.actionType === action) &&
-        (role === "" || interaction.userRole === role) &&
-        (page === "" || interaction.pageName === page)
-    );
-
-    // Ensure current page is valid
-    const maxPage = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
-    currentPage = Math.min(currentPage, maxPage);
-}
-
-function updateUI() {
-    populateFilterOptions();
-    updateTable();
-    updateStats();
-    updateCharts();
-}
-
 function handleReconnect() {
     if (!reconnectInterval && reconnectAttempts < maxReconnectAttempts) {
         reconnectAttempts++;
-        const delay = Math.min(1000 * reconnectAttempts, 10000); // Exponential backoff
+        const delay = Math.min(1000 * reconnectAttempts, 10000);
         reconnectInterval = setTimeout(() => {
             console.log(`Reconnecting attempt ${reconnectAttempts}...`);
             initWebSocket();
@@ -96,24 +94,22 @@ function clearReconnectAttempts() {
 }
 
 function updateConnectionStatus(status) {
-    const statusElement = document.getElementById('connectionStatus');
-    if (!statusElement) {
-        // Create status element if it doesn't exist
-        const newStatusElement = document.createElement('div');
-        newStatusElement.id = 'connectionStatus';
-        newStatusElement.style.position = 'fixed';
-        newStatusElement.style.bottom = '10px';
-        newStatusElement.style.right = '10px';
-        newStatusElement.style.padding = '5px 10px';
-        newStatusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
-        newStatusElement.style.color = 'white';
-        newStatusElement.style.borderRadius = '5px';
-        newStatusElement.style.zIndex = '1000';
-        newStatusElement.textContent = status;
-        document.body.appendChild(newStatusElement);
-    } else {
-        statusElement.textContent = status;
-        statusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
+    const statusElement = document.getElementById('connectionStatus') ||
+        document.createElement('div');
+
+    statusElement.id = 'connectionStatus';
+    statusElement.style.position = 'fixed';
+    statusElement.style.bottom = '10px';
+    statusElement.style.right = '10px';
+    statusElement.style.padding = '5px 10px';
+    statusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
+    statusElement.style.color = 'white';
+    statusElement.style.borderRadius = '5px';
+    statusElement.style.zIndex = '1000';
+    statusElement.textContent = status;
+
+    if (!document.getElementById('connectionStatus')) {
+        document.body.appendChild(statusElement);
     }
 }
 
@@ -122,6 +118,7 @@ async function loadInteractions() {
     if (!isConnected) {
         apiHitCount++;
         try {
+            console.log('Attempting to load interactions via API');
             const response = await fetch("http://localhost:9090/api/interactions");
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const newData = await response.json();
@@ -133,13 +130,29 @@ async function loadInteractions() {
     }
 }
 
+function handleNewData(newData) {
+    // Normalize all incoming data
+    allData = newData.map(normalizeInteraction);
+
+    // Save current filter values
+    const currentFilters = {
+        user: document.getElementById("userFilter")?.value || "",
+        action: document.getElementById("actionFilter")?.value || "",
+        role: document.getElementById("roleFilter")?.value || "",
+        page: document.getElementById("pageFilter")?.value || ""
+    };
+
+    applyFilters(currentFilters);
+    updateUI();
+}
+
 // Filter Functions
 function populateFilterOptions() {
     const filters = [
-        { id: "userFilter", key: "userName" },
-        { id: "actionFilter", key: "actionType" },
-        { id: "roleFilter", key: "userRole" },
-        { id: "pageFilter", key: "pageName" }
+        { id: "userFilter", key: "userName", label: "User" },
+        { id: "actionFilter", key: "actionType", label: "Action" },
+        { id: "roleFilter", key: "userRole", label: "Role" },
+        { id: "pageFilter", key: "pageName", label: "Page" }
     ];
 
     filters.forEach(filter => {
@@ -150,10 +163,14 @@ function populateFilterOptions() {
         const currentValue = element.value;
 
         // Reset options
-        element.innerHTML = `<option value="">All ${filter.key.replace(/([A-Z])/g, ' $1').trim()}</option>`;
+        element.innerHTML = `<option value="">All ${filter.label}</option>`;
 
-        // Add unique values
-        const uniqueValues = [...new Set(allData.map(item => item[filter.key]))].filter(Boolean);
+        // Get unique values
+        const uniqueValues = [...new Set(allData.map(item => item[filter.key]))]
+            .filter(Boolean)
+            .sort();
+
+        // Add options
         uniqueValues.forEach(value => {
             const option = document.createElement('option');
             option.value = value;
@@ -168,12 +185,25 @@ function populateFilterOptions() {
     });
 }
 
+function applyFilters({user, action, role, page}) {
+    filteredData = allData.filter(interaction =>
+        (user === "" || interaction.userName === user) &&
+        (action === "" || interaction.actionType === action) &&
+        (role === "" || interaction.userRole === role) &&
+        (page === "" || interaction.pageName === page)
+    );
+
+    // Ensure current page is valid
+    const maxPage = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
+    currentPage = Math.min(currentPage, maxPage);
+}
+
 function applyFilter() {
     const currentFilters = {
-        user: document.getElementById("userFilter").value,
-        action: document.getElementById("actionFilter").value,
-        role: document.getElementById("roleFilter").value,
-        page: document.getElementById("pageFilter").value
+        user: document.getElementById("userFilter")?.value || "",
+        action: document.getElementById("actionFilter")?.value || "",
+        role: document.getElementById("roleFilter")?.value || "",
+        page: document.getElementById("pageFilter")?.value || ""
     };
 
     applyFilters(currentFilters);
@@ -198,16 +228,17 @@ function updateTable() {
     tableBody.innerHTML = pageData.map((interaction, index) => `
         <tr>
             <td>${start + index + 1}</td>
-            <td>${interaction.userName || "N/A"}</td>
-            <td>${interaction.userRole || "N/A"}</td>
-            <td>${interaction.actionType || "N/A"}</td>
+            <td>${interaction.userName}</td>
+            <td>${interaction.userRole}</td>
+            <td>${interaction.actionType}</td>
             <td>
                 <button class="page-button" 
-                        onclick="redirectToDetails('${interaction.userName}', '${interaction.pageName}')">
-                    ${interaction.pageName || "N/A"}
+                        onclick="redirectToDetails('${encodeURIComponent(interaction.userName)}', 
+                                '${encodeURIComponent(interaction.pageName)}')">
+                    ${interaction.pageName}
                 </button>
             </td>
-            <td>${new Date(interaction.timestamp).toLocaleString() || "N/A"}</td>
+            <td>${interaction.formattedCreatedAt}</td>
         </tr>
     `).join('');
 
@@ -215,7 +246,7 @@ function updateTable() {
 }
 
 function redirectToDetails(user, page) {
-    window.open(`user-page-details.html?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`, "_blank");
+    window.open(`user-page-details.html?user=${user}&page=${page}`, "_blank");
 }
 
 function updatePaginationButtons() {
@@ -248,15 +279,17 @@ function calculateGiniCoefficient(data) {
 }
 
 function updateStats() {
+    // Calculate action counts per user
     const userActionCounts = {};
     filteredData.forEach(interaction => {
         const user = interaction.userName;
         userActionCounts[user] = (userActionCounts[user] || 0) + 1;
     });
 
+    // Add actionCount to each interaction
     filteredData = filteredData.map(interaction => ({
         ...interaction,
-        actionCount: userActionCounts[interaction.userName]
+        actionCount: userActionCounts[interaction.userName] || 0
     }));
 
     const totalActions = filteredData.length;
@@ -264,12 +297,18 @@ function updateStats() {
     const gini = calculateGiniCoefficient(filteredData);
     const giniPercentage = (gini * 100).toFixed(2);
 
-    document.getElementById("totalActions").textContent = totalActions;
-    document.getElementById("totalUsers").textContent = userSet.size;
-    document.getElementById("usersWithActions").textContent = userSet.size;
-    document.getElementById("actionsPerUser").textContent = userSet.size ? (totalActions / userSet.size).toFixed(2) : 0;
-    document.getElementById("giniPercentage").textContent = `${giniPercentage}%`;
-    document.getElementById("apiHitCount").textContent = apiHitCount;
+    // Update DOM elements
+    const setTextContent = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+
+    setTextContent("totalActions", totalActions);
+    setTextContent("totalUsers", userSet.size);
+    setTextContent("usersWithActions", userSet.size);
+    setTextContent("actionsPerUser", userSet.size ? (totalActions / userSet.size).toFixed(2) : 0);
+    setTextContent("giniPercentage", `${giniPercentage}%`);
+    setTextContent("apiHitCount", apiHitCount);
 }
 
 // Chart Functions
@@ -280,161 +319,197 @@ function updateCharts() {
     updateRankingChart('rolePieChart', 'userRole', 'Role', 'pie');
 }
 
-function updateDailyActionChart() {
-    // Group by date and count actions
-    const dateCounts = {};
-    filteredData.forEach(interaction => {
-        const date = interaction.timestamp.split('T')[0];
-        dateCounts[date] = (dateCounts[date] || 0) + 1;
-    });
+function updateChart(canvasId, type, label, color, property) {
+    try {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.error(`Canvas not found: ${canvasId}`);
+            return;
+        }
 
-    // Convert to array and sort by date
-    const sortedDates = Object.keys(dateCounts).sort((a, b) => new Date(a) - new Date(b));
-    const sortedCounts = sortedDates.map(date => dateCounts[date]);
+        // Filter out interactions without the property
+        const validData = filteredData.filter(i => i[property]);
+        if (validData.length === 0) return;
 
-    // Destroy previous chart instance if exists
-    if (chartInstances['dailyActionChart']) {
-        chartInstances['dailyActionChart'].destroy();
-    }
+        // Count occurrences
+        const counts = {};
+        validData.forEach(interaction => {
+            const key = interaction[property];
+            counts[key] = (counts[key] || 0) + 1;
+        });
 
-    const ctx = document.getElementById('dailyActionChart').getContext('2d');
-    chartInstances['dailyActionChart'] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: sortedDates,
-            datasets: [{
-                label: 'Total Actions per Day',
-                data: sortedCounts,
-                borderColor: "#28a745",
-                backgroundColor: "rgba(40, 167, 69, 0.1)",
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Actions'
+        // Destroy previous chart if exists
+        if (chartInstances[canvasId]) {
+            chartInstances[canvasId].destroy();
+        }
+
+        // Create new chart
+        const ctx = canvas.getContext('2d');
+        chartInstances[canvasId] = new Chart(ctx, {
+            type,
+            data: {
+                labels: Object.keys(counts),
+                datasets: [{
+                    label,
+                    data: Object.values(counts),
+                    backgroundColor: type === 'bar' ? color : undefined,
+                    borderColor: color,
+                    borderWidth: 1,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: type !== 'bar'
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error(`Error creating ${canvasId} chart:`, error);
+    }
 }
 
-function updateChart(canvasId, type, label, color, property, isDate = false) {
-    const counts = {};
-    filteredData.forEach(interaction => {
-        const key = isDate ? interaction[property].split('T')[0] : interaction[property];
-        counts[key] = (counts[key] || 0) + 1;
-    });
+function updateDailyActionChart() {
+    try {
+        const canvas = document.getElementById('dailyActionChart');
+        if (!canvas) return;
 
-    // Destroy previous chart instance if exists
-    if (chartInstances[canvasId]) {
-        chartInstances[canvasId].destroy();
-    }
+        // Count actions per date
+        const dateCounts = {};
+        filteredData.forEach(interaction => {
+            const date = interaction.datePart;
+            dateCounts[date] = (dateCounts[date] || 0) + 1;
+        });
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    chartInstances[canvasId] = new Chart(ctx, {
-        type,
-        data: {
-            labels: Object.keys(counts),
-            datasets: [{
-                label,
-                data: Object.values(counts),
-                backgroundColor: type === 'bar' ? color : undefined,
-                borderColor: color,
-                borderWidth: 1,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
+        // Sort by date
+        const sortedDates = Object.keys(dateCounts).sort((a, b) => new Date(a) - new Date(b));
+        const sortedCounts = sortedDates.map(date => dateCounts[date]);
+
+        // Destroy previous chart
+        if (chartInstances['dailyActionChart']) {
+            chartInstances['dailyActionChart'].destroy();
         }
-    });
+
+        // Create new chart
+        const ctx = canvas.getContext('2d');
+        chartInstances['dailyActionChart'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sortedDates,
+                datasets: [{
+                    label: 'Total Actions per Day',
+                    data: sortedCounts,
+                    borderColor: "#28a745",
+                    backgroundColor: "rgba(40, 167, 69, 0.1)",
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Date' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Number of Actions' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error creating daily action chart:', error);
+    }
 }
 
 function updateRankingChart(canvasId, property, label, type = 'bar') {
-    const counts = {};
-    filteredData.forEach(interaction => {
-        const key = interaction[property] || `Unknown ${label}`;
-        counts[key] = (counts[key] || 0) + 1;
-    });
+    try {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
 
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const topItems = type === 'pie' ? sorted : sorted.slice(0, 5);
+        // Count occurrences
+        const counts = {};
+        filteredData.forEach(interaction => {
+            const key = interaction[property] || `Unknown ${label}`;
+            counts[key] = (counts[key] || 0) + 1;
+        });
 
-    // Destroy previous chart instance if exists
-    if (chartInstances[canvasId]) {
-        chartInstances[canvasId].destroy();
-    }
+        // Sort and get top items
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const topItems = type === 'pie' ? sorted : sorted.slice(0, 5);
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    chartInstances[canvasId] = new Chart(ctx, {
-        type,
-        data: {
-            labels: topItems.map(([key]) => key),
-            datasets: [{
-                label: type === 'pie' ? `Users by ${label}` : 'Actions',
-                data: topItems.map(([, count]) => count),
-                backgroundColor: type === 'pie' ? [
-                    "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
-                    "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"
-                ] : "#007bff",
-                borderColor: type === 'pie' ? "#1e1e2e" : "#0056b3",
-                borderWidth: type === 'pie' ? 2 : 1
-            }]
-        },
-        options: {
-            indexAxis: type === 'pie' ? undefined : 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: type === 'pie',
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: type === 'pie' ? undefined : (context) =>
-                            `Rank ${context.dataIndex + 1}: ${context.raw} actions`
-                    }
-                }
+        // Destroy previous chart
+        if (chartInstances[canvasId]) {
+            chartInstances[canvasId].destroy();
+        }
+
+        // Create new chart
+        const ctx = canvas.getContext('2d');
+        chartInstances[canvasId] = new Chart(ctx, {
+            type,
+            data: {
+                labels: topItems.map(([key]) => key),
+                datasets: [{
+                    label: type === 'pie' ? `Users by ${label}` : 'Actions',
+                    data: topItems.map(([, count]) => count),
+                    backgroundColor: type === 'pie' ? [
+                        "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
+                        "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"
+                    ] : "#007bff",
+                    borderColor: type === 'pie' ? "#1e1e2e" : "#0056b3",
+                    borderWidth: type === 'pie' ? 2 : 1
+                }]
             },
-            scales: type === 'pie' ? undefined : {
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: "Number of Actions"
+            options: {
+                indexAxis: type === 'pie' ? undefined : 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: type === 'pie',
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: type === 'pie' ? undefined : (context) =>
+                                `Rank ${context.dataIndex + 1}: ${context.raw} actions`
+                        }
                     }
                 },
-                y: {
-                    title: {
-                        display: true,
-                        text: label
+                scales: type === 'pie' ? undefined : {
+                    x: {
+                        beginAtZero: true,
+                        title: { display: true, text: "Number of Actions" }
+                    },
+                    y: {
+                        title: { display: true, text: label }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error(`Error creating ${canvasId} chart:`, error);
+    }
+}
+
+// UI Update Function
+function updateUI() {
+    populateFilterOptions();
+    updateTable();
+    updateStats();
+    updateCharts();
 }
 
 // Event Listeners
 function setupEventListeners() {
+    // Pagination
     document.getElementById("prevPage")?.addEventListener("click", () => {
         if (currentPage > 1) {
             currentPage--;
@@ -449,6 +524,7 @@ function setupEventListeners() {
         }
     });
 
+    // Buttons
     document.getElementById("sendInteractionsButton")?.addEventListener("click", async () => {
         try {
             const response = await fetch("http://localhost:9090/api/interactions/send-from-file", {
@@ -470,9 +546,12 @@ function initializeApp() {
     setupEventListeners();
     initWebSocket();
     loadInteractions();
+
+    // Initial UI update
+    updateUI();
 }
 
-// Start the application
+// Start the application when DOM is loaded
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 // Make redirect function available globally

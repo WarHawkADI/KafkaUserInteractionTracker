@@ -4,12 +4,13 @@ import com.example.userinteraction.model.UserInteractionDTO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,21 +26,27 @@ public class KafkaProducerService {
     public KafkaProducerService(KafkaTemplate<String, UserInteractionDTO> kafkaTemplate, ObjectMapper objectMapper) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
-    /**
-     * Reads JSON file and converts it to a list of UserInteractionDTO objects.
-     */
     public List<UserInteractionDTO> readInteractionsFromFile() {
         logger.info("📂 Attempting to read interactions.json...");
 
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("interactions.json")) {
             if (inputStream == null) {
                 logger.error("❌ interactions.json file not found in resources!");
-                throw new RuntimeException("❌ interactions.json file not found!");
+                throw new RuntimeException("interactions.json file not found!");
             }
 
             List<UserInteractionDTO> interactions = objectMapper.readValue(inputStream, new TypeReference<>() {});
+
+            // Ensure createdAt is set for all interactions
+            interactions.forEach(interaction -> {
+                if (interaction.getCreatedAt() == null) {
+                    interaction.setCreatedAt(LocalDateTime.now());
+                }
+            });
+
             logger.info("✅ Successfully read {} interactions from interactions.json", interactions.size());
             return interactions;
         } catch (Exception e) {
@@ -48,9 +55,6 @@ public class KafkaProducerService {
         }
     }
 
-    /**
-     * Sends interactions from the file at 5-second intervals.
-     */
     public void sendInteractionsWithDelay() {
         logger.info("📤 Starting to send interactions at 5s intervals...");
         List<UserInteractionDTO> interactions = readInteractionsFromFile();
@@ -68,12 +72,16 @@ public class KafkaProducerService {
         }, interactions.size() * 5L, TimeUnit.SECONDS);
     }
 
-    /**
-     * Sends a single UserInteractionDTO to Kafka.
-     */
     public void sendInteraction(UserInteractionDTO interaction) {
         try {
-            String key = (interaction.getUserId() != null && !interaction.getUserId().isEmpty()) ? interaction.getUserId() : "guest";
+            // Ensure createdAt is never null
+            if (interaction.getCreatedAt() == null) {
+                interaction.setCreatedAt(LocalDateTime.now());
+            }
+
+            String key = (interaction.getUserId() != null && !interaction.getUserId().isEmpty())
+                    ? interaction.getUserId()
+                    : "guest";
 
             kafkaTemplate.send(new ProducerRecord<>("user-interactions", key, interaction));
             logger.info("✅ Kafka Message Sent: [User: {} | Page: {} | Action: {}]",

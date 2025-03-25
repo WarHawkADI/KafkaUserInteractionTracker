@@ -5,7 +5,9 @@ import com.example.userinteraction.service.UserInteractionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Controller
 public class WebSocketController {
@@ -20,11 +22,20 @@ public class WebSocketController {
         this.interactionService = interactionService;
     }
 
-    /**
-     * Broadcasts all interactions to WebSocket clients
-     * @param interactions List of UserInteractionDTO to broadcast
-     */
     public void sendInteractionUpdates(List<UserInteractionDTO> interactions) {
-        messagingTemplate.convertAndSend("/topic/interactions", interactions);
+        // Ensure consistent data format before sending
+        List<UserInteractionDTO> sanitizedInteractions = interactions.stream()
+                .map(this::sanitizeInteraction)
+                .collect(Collectors.toList());
+
+        messagingTemplate.convertAndSend("/topic/interactions", sanitizedInteractions);
+    }
+
+    private UserInteractionDTO sanitizeInteraction(UserInteractionDTO interaction) {
+        if (interaction.getUserName() == null) interaction.setUserName("Unknown");
+        if (interaction.getUserRole() == null) interaction.setUserRole("Unknown");
+        if (interaction.getActionType() == null) interaction.setActionType("Unknown");
+        if (interaction.getPageName() == null) interaction.setPageName("Unknown");
+        return interaction;
     }
 }

@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.2' // Use stable version
+    id 'org.springframework.boot' version '3.2.2'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -25,24 +25,28 @@ repositories {
 }
 
 dependencies {
+    // Core Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
-    implementation 'org.springframework.boot:spring-boot-starter'
+    // Kafka
     implementation 'org.springframework.kafka:spring-kafka'
-    implementation 'org.projectlombok:lombok'
-    implementation 'org.slf4j:slf4j-api:2.0.9'
-    implementation 'org.springframework.boot:spring-boot-starter-logging'
 
-
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'  // WebSocket
-    implementation 'org.springframework.kafka:spring-kafka'                  // Existing Kafka
-    implementation 'com.fasterxml.jackson.core:jackson-databind'             // Existing JSON
-
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-}
 
+    // Elasticsearch - Use compatible versions
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+    implementation 'co.elastic.clients:elasticsearch-java:8.11.4' // Matches Spring Boot 3.2.2
+
+    // Required JSON dependencies
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'jakarta.json:jakarta.json-api:2.0.1' // Explicit version
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
 tasks.named('test') {
     useJUnitPlatform()
 }

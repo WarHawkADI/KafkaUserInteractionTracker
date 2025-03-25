@@ -1,37 +1,38 @@
 package com.example.userinteraction.service;
 
 import com.example.userinteraction.model.UserInteractionDTO;
+import com.example.userinteraction.repository.UserInteractionRepository;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class UserInteractionService {
 
-    private final List<UserInteractionDTO> interactionStorage = new ArrayList<>();
+    private final UserInteractionRepository interactionRepository;
 
-    /**
-     * Store a new interaction in memory.
-     */
+    public UserInteractionService(UserInteractionRepository interactionRepository) {
+        this.interactionRepository = interactionRepository;
+    }
+
     public void storeInteraction(UserInteractionDTO interaction) {
-        interactionStorage.add(interaction);
+        interactionRepository.save(interaction);
     }
 
-    /**
-     * Get all stored interactions.
-     */
     public List<UserInteractionDTO> getAllInteractions() {
-        return new ArrayList<>(interactionStorage);
+        // Convert Page to List
+        Page<UserInteractionDTO> page = interactionRepository.findAll(org.springframework.data.domain.Pageable.unpaged());
+        return page.getContent(); // This returns a List
     }
 
-    /**
-     * Get interactions for a specific user and page.
-     */
     public List<UserInteractionDTO> getInteractionsByUserAndPage(String user, String page) {
-        return interactionStorage.stream()
-                .filter(interaction -> interaction.getUserName().equals(user) && interaction.getPageName().equals(page))
-                .collect(Collectors.toList());
+        return interactionRepository.findByUserNameAndPageName(user, page);
+    }
+
+    public List<UserInteractionDTO> getInteractionsByDateRange(LocalDateTime start, LocalDateTime end) {
+        return interactionRepository.findByCreatedAtBetween(start, end);
     }
 }
