@@ -22,7 +22,7 @@ h2 {
     text-align: center;
     margin-bottom: 30px;
     color: #4fc3f7;
-    font-size: 2.5rem;
+    font-size: 4rem;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -99,8 +99,13 @@ button {
     color: white;
 }
 
-#applyFilterButton {
+.apply-button {
     background-color: #4caf50;
+    color: white;
+}
+
+.reset-button {
+    background-color: #f44336;
     color: white;
 }
 
@@ -150,6 +155,20 @@ select {
 }
 
 select:hover {
+    border-color: #4fc3f7;
+}
+
+.date-filter {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background-color: #3a3a4d;
+    color: white;
+    font-family: inherit;
+}
+
+.date-filter:focus {
+    outline: none;
     border-color: #4fc3f7;
 }
 

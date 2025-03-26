@@ -40,7 +40,8 @@ function normalizeInteraction(interaction) {
         actionType: interaction.actionType || "Unknown",
         pageName: interaction.pageName || "Unknown",
         formattedCreatedAt: formatDate(interaction.createdAt),
-        datePart: extractDatePart(interaction.createdAt)
+        datePart: extractDatePart(interaction.createdAt),
+        timestamp: new Date(interaction.createdAt).getTime() || 0
     };
 }
 
@@ -134,16 +135,46 @@ function handleNewData(newData) {
     // Normalize all incoming data
     allData = newData.map(normalizeInteraction);
 
+    // Set default date range to cover all data
+    setDefaultDateRange();
+
     // Save current filter values
     const currentFilters = {
         user: document.getElementById("userFilter")?.value || "",
         action: document.getElementById("actionFilter")?.value || "",
         role: document.getElementById("roleFilter")?.value || "",
-        page: document.getElementById("pageFilter")?.value || ""
+        page: document.getElementById("pageFilter")?.value || "",
+        startDate: document.getElementById("startDate")?.value || "",
+        endDate: document.getElementById("endDate")?.value || ""
     };
 
     applyFilters(currentFilters);
     updateUI();
+}
+
+function setDefaultDateRange() {
+    if (allData.length === 0) return;
+
+    const timestamps = allData.map(item => item.timestamp).filter(t => t > 0);
+    if (timestamps.length === 0) return;
+
+    const minDate = new Date(Math.min(...timestamps));
+    const maxDate = new Date(Math.max(...timestamps));
+
+    const startDateEl = document.getElementById("startDate");
+    const endDateEl = document.getElementById("endDate");
+
+    if (startDateEl) {
+        startDateEl.valueAsDate = minDate;
+        startDateEl.min = minDate.toISOString().split('T')[0];
+        startDateEl.max = maxDate.toISOString().split('T')[0];
+    }
+
+    if (endDateEl) {
+        endDateEl.valueAsDate = maxDate;
+        endDateEl.min = minDate.toISOString().split('T')[0];
+        endDateEl.max = maxDate.toISOString().split('T')[0];
+    }
 }
 
 // Filter Functions
@@ -185,13 +216,28 @@ function populateFilterOptions() {
     });
 }
 
-function applyFilters({user, action, role, page}) {
-    filteredData = allData.filter(interaction =>
-        (user === "" || interaction.userName === user) &&
-        (action === "" || interaction.actionType === action) &&
-        (role === "" || interaction.userRole === role) &&
-        (page === "" || interaction.pageName === page)
-    );
+function applyFilters({user, action, role, page, startDate, endDate}) {
+    filteredData = allData.filter(interaction => {
+        // Apply dropdown filters
+        if (user && interaction.userName !== user) return false;
+        if (action && interaction.actionType !== action) return false;
+        if (role && interaction.userRole !== role) return false;
+        if (page && interaction.pageName !== page) return false;
+
+        // Apply date range filter
+        if (startDate) {
+            const startTimestamp = new Date(startDate).getTime();
+            if (interaction.timestamp < startTimestamp) return false;
+        }
+
+        if (endDate) {
+            const endOfDay = new Date(endDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            if (interaction.timestamp > endOfDay.getTime()) return false;
+        }
+
+        return true;
+    });
 
     // Ensure current page is valid
     const maxPage = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
@@ -203,11 +249,27 @@ function applyFilter() {
         user: document.getElementById("userFilter")?.value || "",
         action: document.getElementById("actionFilter")?.value || "",
         role: document.getElementById("roleFilter")?.value || "",
-        page: document.getElementById("pageFilter")?.value || ""
+        page: document.getElementById("pageFilter")?.value || "",
+        startDate: document.getElementById("startDate")?.value || "",
+        endDate: document.getElementById("endDate")?.value || ""
     };
 
     applyFilters(currentFilters);
     updateUI();
+}
+
+function resetFilters() {
+    // Reset dropdown filters
+    document.getElementById("userFilter").value = "";
+    document.getElementById("actionFilter").value = "";
+    document.getElementById("roleFilter").value = "";
+    document.getElementById("pageFilter").value = "";
+
+    // Reset date range to cover all data
+    setDefaultDateRange();
+
+    // Apply the reset filters
+    applyFilter();
 }
 
 // Table Functions
@@ -252,9 +314,13 @@ function redirectToDetails(user, page) {
 function updatePaginationButtons() {
     const prevBtn = document.getElementById("prevPage");
     const nextBtn = document.getElementById("nextPage");
-    if (prevBtn && nextBtn) {
+    const pageInfo = document.getElementById("pageInfo");
+
+    if (prevBtn && nextBtn && pageInfo) {
+        const totalPages = Math.ceil(filteredData.length / rowsPerPage);
         prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage * rowsPerPage >= filteredData.length;
+        nextBtn.disabled = currentPage >= totalPages;
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
     }
 }
 
@@ -538,6 +604,7 @@ function setupEventListeners() {
     });
 
     document.getElementById("applyFilterButton")?.addEventListener("click", applyFilter);
+    document.getElementById("resetFilterButton")?.addEventListener("click", resetFilters);
     document.getElementById("refreshButton")?.addEventListener("click", loadInteractions);
 }
 

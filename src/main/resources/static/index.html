@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
-
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -60,7 +59,14 @@
             </select>
         </div>
 
-        <button id="applyFilterButton">Apply Filter</button>
+        <label>From:</label>
+        <input type="date" id="startDate" class="date-filter">
+
+        <label>To:</label>
+        <input type="date" id="endDate" class="date-filter">
+
+        <button id="applyFilterButton" class="apply-button">Apply Filter</button>
+        <button id="resetFilterButton" class="reset-button">Reset</button>
     </div>
 
     <!-- Table -->
@@ -85,26 +91,27 @@
     <!-- Pagination -->
     <div id="pagination" class="pagination">
         <button id="prevPage">Previous</button>
+        <span id="pageInfo">Page 1 of 1</span>
         <button id="nextPage">Next</button>
     </div>
 
     <!-- Charts -->
-    <div class="chart-container">
-        <canvas id="actionChart"></canvas>
+    <div class="chart-row">
+        <div class="chart-container">
+            <canvas id="actionChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="dailyActionChart"></canvas>
+        </div>
     </div>
 
-    <div class="chart-container">
-        <canvas id="dailyActionChart"></canvas>
-    </div>
-
-    <!-- New Chart: Horizontal Bar Chart with Ranking -->
-    <div class="chart-container">
-        <canvas id="pageRankingChart"></canvas>
-    </div>
-
-    <!-- New Chart: Pie Chart for User Roles -->
-    <div class="chart-container">
-        <canvas id="rolePieChart"></canvas>
+    <div class="chart-row">
+        <div class="chart-container">
+            <canvas id="pageRankingChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="rolePieChart"></canvas>
+        </div>
     </div>
 </div>
 
