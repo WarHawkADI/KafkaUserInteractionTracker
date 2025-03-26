@@ -117,6 +117,9 @@ The **real-time dashboard** provides a comprehensive view of user interactions w
 3. Build the project using Gradle.
 4. Run the application.
 5. Access the dashboard by opening `index.html` in your browser.
+ 6.  .\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+  7. .\bin\windows\kafka-server-start.bat .\config\server.properties
+
 
 ---
 
