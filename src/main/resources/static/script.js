@@ -58,6 +58,7 @@ function extractDatePart(dateString) {
 function normalizeInteraction(interaction) {
     return {
         ...interaction,
+        id: interaction.id || Math.random().toString(36).substring(2, 9),
         userName: interaction.userName || "Unknown",
         userRole: interaction.userRole || "Unknown",
         actionType: interaction.actionType || "Unknown",
@@ -139,14 +140,20 @@ async function fetchLatestData() {
         clearError();
 
         const response = await fetch(`${API_BASE_URL}/elastic/latest`);
-
         if (!response.ok) {
             throw new Error(`Server error: ${response.status}`);
         }
 
         const newData = await response.json();
-        allData = newData.map(normalizeInteraction);
+        const normalizedNewData = newData.map(normalizeInteraction);
+
+        // Merge new data with existing data, avoiding duplicates
+        const newDataIds = new Set(normalizedNewData.map(item => item.id));
+        const existingData = allData.filter(item => !newDataIds.has(item.id));
+
+        allData = [...normalizedNewData, ...existingData];
         newDataAvailable = false;
+
         setDefaultDateRange();
         applyCurrentFilters();
 
@@ -229,7 +236,7 @@ function updatePaginationButtons() {
         const totalPages = Math.ceil(filteredData.length / rowsPerPage);
         elements.prevPage.disabled = currentPage === 1;
         elements.nextPage.disabled = currentPage >= totalPages;
-        elements.pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        elements.pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${filteredData.length} total records)`;
     }
 }
 
@@ -310,8 +317,6 @@ function applyCurrentFilters() {
 
         return true;
     });
-
-    // Don't reset currentPage here - it will be handled by the reset button
 }
 
 function populateFilterOptions() {
@@ -573,7 +578,7 @@ function setupEventListeners() {
 
     if (elements.applyFilterButton) {
         elements.applyFilterButton.addEventListener("click", () => {
-            currentPage = 1; // Reset to page 1 only when applying new filters
+            currentPage = 1;
             applyCurrentFilters();
             updateUI();
         });
@@ -586,7 +591,7 @@ function setupEventListeners() {
             if (elements.roleFilter) elements.roleFilter.value = "";
             if (elements.pageFilter) elements.pageFilter.value = "";
             setDefaultDateRange();
-            currentPage = 1; // Reset to page 1 when resetting filters
+            currentPage = 1;
             applyCurrentFilters();
             updateUI();
         });
