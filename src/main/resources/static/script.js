@@ -8,6 +8,8 @@ let chartInstances = {};
 let stompClient = null;
 let socket = null;
 let newDataAvailable = false;
+let lastRefreshTimestamp = 0;
+let isInitialLoad = true;
 
 // DOM Elements
 const elements = {
@@ -56,6 +58,10 @@ function extractDatePart(dateString) {
 }
 
 function normalizeInteraction(interaction) {
+    const createdAt = interaction.createdAt ?
+        (typeof interaction.createdAt === 'string' ? interaction.createdAt : interaction.createdAt.toString()) :
+        new Date().toISOString();
+
     return {
         ...interaction,
         id: interaction.id || Math.random().toString(36).substring(2, 9),
@@ -63,9 +69,9 @@ function normalizeInteraction(interaction) {
         userRole: interaction.userRole || "Unknown",
         actionType: interaction.actionType || "Unknown",
         pageName: interaction.pageName || "Unknown",
-        formattedCreatedAt: formatDate(interaction.createdAt),
-        datePart: extractDatePart(interaction.createdAt),
-        timestamp: new Date(interaction.createdAt).getTime() || 0
+        formattedCreatedAt: formatDate(createdAt),
+        datePart: extractDatePart(createdAt),
+        timestamp: new Date(createdAt).getTime() || Date.now()
     };
 }
 
@@ -77,6 +83,10 @@ function connectWebSocket() {
 
     socket = new SockJS(API_BASE_URL + '/ws');
     stompClient = Stomp.over(socket);
+    stompClient.debug = () => {}; // Disable debug logging
+
+    elements.connectionStatus.textContent = "WebSocket: Connecting...";
+    elements.connectionStatus.className = "connection-status connecting";
 
     stompClient.connect({}, function(frame) {
         updateConnectionStatus(true);
@@ -90,6 +100,7 @@ function connectWebSocket() {
         });
     }, function(error) {
         updateConnectionStatus(false);
+        console.error("WebSocket connection error:", error);
         setTimeout(connectWebSocket, 5000);
     });
 }
@@ -132,9 +143,13 @@ function showNotification(message) {
 // Data Loading
 async function fetchLatestData() {
     try {
-        // Store current state before refresh
-        const scrollPosition = window.scrollY;
-        const currentPageBeforeRefresh = currentPage;
+        // Prevent rapid refreshes
+        const now = Date.now();
+        if (now - lastRefreshTimestamp < 2000 && !isInitialLoad) { // 2 second cooldown
+            return;
+        }
+        isInitialLoad = false;
+        lastRefreshTimestamp = now;
 
         showLoadingIndicator(true);
         clearError();
@@ -147,27 +162,15 @@ async function fetchLatestData() {
         const newData = await response.json();
         const normalizedNewData = newData.map(normalizeInteraction);
 
-        // Merge new data with existing data, avoiding duplicates
-        const newDataIds = new Set(normalizedNewData.map(item => item.id));
-        const existingData = allData.filter(item => !newDataIds.has(item.id));
-
-        allData = [...normalizedNewData, ...existingData];
+        // Replace all data instead of merging to prevent duplicates
+        allData = normalizedNewData;
         newDataAvailable = false;
 
         setDefaultDateRange();
         applyCurrentFilters();
-
-        // Restore the page position
-        currentPage = currentPageBeforeRefresh;
-
         updateUI();
         updateRefreshButtonState();
         updateLastRefreshedTime();
-
-        // Restore scroll position
-        setTimeout(() => {
-            window.scrollTo(0, scrollPosition);
-        }, 0);
 
     } catch (error) {
         console.error("Error loading interactions:", error);
@@ -186,8 +189,14 @@ function setDefaultDateRange() {
     const minDate = new Date(Math.min(...timestamps));
     const maxDate = new Date(Math.max(...timestamps));
 
-    if (elements.startDate) elements.startDate.valueAsDate = minDate;
-    if (elements.endDate) elements.endDate.valueAsDate = maxDate;
+    if (elements.startDate) {
+        elements.startDate.valueAsDate = minDate;
+        elements.startDate.min = minDate.toISOString().split('T')[0];
+    }
+    if (elements.endDate) {
+        elements.endDate.valueAsDate = maxDate;
+        elements.endDate.max = maxDate.toISOString().split('T')[0];
+    }
 }
 
 // UI Update functions
@@ -317,6 +326,8 @@ function applyCurrentFilters() {
 
         return true;
     });
+
+    currentPage = 1; // Reset to first page when filters change
 }
 
 function populateFilterOptions() {
@@ -578,7 +589,6 @@ function setupEventListeners() {
 
     if (elements.applyFilterButton) {
         elements.applyFilterButton.addEventListener("click", () => {
-            currentPage = 1;
             applyCurrentFilters();
             updateUI();
         });
@@ -591,7 +601,6 @@ function setupEventListeners() {
             if (elements.roleFilter) elements.roleFilter.value = "";
             if (elements.pageFilter) elements.pageFilter.value = "";
             setDefaultDateRange();
-            currentPage = 1;
             applyCurrentFilters();
             updateUI();
         });
@@ -623,6 +632,7 @@ function initializeApp() {
     filteredData = [];
     currentPage = 1;
     newDataAvailable = false;
+    isInitialLoad = true;
 
     // Clear charts
     Object.values(chartInstances).forEach(chart => chart.destroy());
