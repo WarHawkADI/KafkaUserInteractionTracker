@@ -1,16 +1,40 @@
 // Global variables
+const API_BASE_URL = 'http://localhost:9090';
 let currentPage = 1;
 const rowsPerPage = 5;
 let allData = [];
 let filteredData = [];
-let apiHitCount = 0;
-let socket = null;
-let stompClient = null;
-let isConnected = false;
-const maxReconnectAttempts = 5;
-let reconnectAttempts = 0;
-let reconnectInterval = null;
 let chartInstances = {};
+let stompClient = null;
+let socket = null;
+let newDataAvailable = false;
+
+// DOM Elements
+const elements = {
+    tableBody: document.getElementById("tableBody"),
+    refreshButton: document.getElementById("refreshButton"),
+    sendInteractionsButton: document.getElementById("sendInteractionsButton"),
+    applyFilterButton: document.getElementById("applyFilterButton"),
+    resetFilterButton: document.getElementById("resetFilterButton"),
+    prevPage: document.getElementById("prevPage"),
+    nextPage: document.getElementById("nextPage"),
+    pageInfo: document.getElementById("pageInfo"),
+    lastRefreshedTime: document.getElementById("lastRefreshedTime"),
+    loadingIndicator: document.getElementById("loadingIndicator"),
+    errorMessage: document.getElementById("errorMessage"),
+    userFilter: document.getElementById("userFilter"),
+    actionFilter: document.getElementById("actionFilter"),
+    roleFilter: document.getElementById("roleFilter"),
+    pageFilter: document.getElementById("pageFilter"),
+    startDate: document.getElementById("startDate"),
+    endDate: document.getElementById("endDate"),
+    totalActions: document.getElementById("totalActions"),
+    totalUsers: document.getElementById("totalUsers"),
+    usersWithActions: document.getElementById("usersWithActions"),
+    actionsPerUser: document.getElementById("actionsPerUser"),
+    giniPercentage: document.getElementById("giniPercentage"),
+    connectionStatus: document.getElementById("connectionStatus")
+};
 
 // Utility functions
 function formatDate(dateString) {
@@ -25,7 +49,6 @@ function formatDate(dateString) {
 
 function extractDatePart(dateString) {
     if (!dateString) return "Unknown";
-    // Handle both ISO format and "yyyy-MM-dd HH:mm:ss" format
     const datePart = dateString.includes('T')
         ? dateString.split('T')[0]
         : dateString.split(' ')[0];
@@ -45,111 +68,106 @@ function normalizeInteraction(interaction) {
     };
 }
 
-// WebSocket Functions
-function initWebSocket() {
-    socket = new SockJS('http://localhost:9090/ws-interactions');
+// WebSocket functions
+function connectWebSocket() {
+    if (stompClient !== null) {
+        stompClient.disconnect();
+    }
+
+    socket = new SockJS(API_BASE_URL + '/ws');
     stompClient = Stomp.over(socket);
 
     stompClient.connect({}, function(frame) {
-        console.log('WebSocket connected:', frame);
-        isConnected = true;
-        updateConnectionStatus('🟢 Connected');
-        clearReconnectAttempts();
+        updateConnectionStatus(true);
 
-        stompClient.subscribe('/topic/interactions', function(message) {
-            try {
-                const newData = JSON.parse(message.body);
-                if (!Array.isArray(newData)) {
-                    throw new Error('Received data is not an array');
-                }
-                handleNewData(newData);
-            } catch (e) {
-                console.error('Error processing WebSocket message:', e);
+        stompClient.subscribe('/topic/notifications', function(message) {
+            if (message.body === "NEW_DATA_AVAILABLE") {
+                newDataAvailable = true;
+                showNotification("New data available! Click Refresh to load.");
+                updateRefreshButtonState();
             }
         });
     }, function(error) {
-        console.error('WebSocket error:', error);
-        isConnected = false;
-        updateConnectionStatus('🔴 Disconnected');
-        handleReconnect();
+        updateConnectionStatus(false);
+        setTimeout(connectWebSocket, 5000);
     });
 }
 
-function handleReconnect() {
-    if (!reconnectInterval && reconnectAttempts < maxReconnectAttempts) {
-        reconnectAttempts++;
-        const delay = Math.min(1000 * reconnectAttempts, 10000);
-        reconnectInterval = setTimeout(() => {
-            console.log(`Reconnecting attempt ${reconnectAttempts}...`);
-            initWebSocket();
-        }, delay);
+function updateConnectionStatus(connected) {
+    if (!elements.connectionStatus) return;
+
+    if (connected) {
+        elements.connectionStatus.textContent = "WebSocket: Connected";
+        elements.connectionStatus.className = "connection-status connected";
+    } else {
+        elements.connectionStatus.textContent = "WebSocket: Disconnected - Reconnecting...";
+        elements.connectionStatus.className = "connection-status disconnected";
     }
 }
 
-function clearReconnectAttempts() {
-    reconnectAttempts = 0;
-    if (reconnectInterval) {
-        clearTimeout(reconnectInterval);
-        reconnectInterval = null;
-    }
-}
-
-function updateConnectionStatus(status) {
-    const statusElement = document.getElementById('connectionStatus') ||
-        document.createElement('div');
-
-    statusElement.id = 'connectionStatus';
-    statusElement.style.position = 'fixed';
-    statusElement.style.bottom = '10px';
-    statusElement.style.right = '10px';
-    statusElement.style.padding = '5px 10px';
-    statusElement.style.backgroundColor = status.includes('🟢') ? '#4CAF50' : '#F44336';
-    statusElement.style.color = 'white';
-    statusElement.style.borderRadius = '5px';
-    statusElement.style.zIndex = '1000';
-    statusElement.textContent = status;
-
-    if (!document.getElementById('connectionStatus')) {
-        document.body.appendChild(statusElement);
-    }
-}
-
-// Data Loading
-async function loadInteractions() {
-    if (!isConnected) {
-        apiHitCount++;
-        try {
-            console.log('Attempting to load interactions via API');
-            const response = await fetch("http://localhost:9090/api/interactions");
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const newData = await response.json();
-            handleNewData(newData);
-        } catch (error) {
-            console.error("Error loading interactions:", error);
-            updateConnectionStatus('🔴 API Fallback Failed');
+function updateRefreshButtonState() {
+    if (elements.refreshButton) {
+        if (newDataAvailable) {
+            elements.refreshButton.classList.add("refresh-button-new-data");
+            elements.refreshButton.textContent = "Refresh (New Data Available)";
+        } else {
+            elements.refreshButton.classList.remove("refresh-button-new-data");
+            elements.refreshButton.textContent = "Refresh Data";
         }
     }
 }
 
-function handleNewData(newData) {
-    // Normalize all incoming data
-    allData = newData.map(normalizeInteraction);
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    document.body.appendChild(notification);
 
-    // Set default date range to cover all data
-    setDefaultDateRange();
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
 
-    // Save current filter values
-    const currentFilters = {
-        user: document.getElementById("userFilter")?.value || "",
-        action: document.getElementById("actionFilter")?.value || "",
-        role: document.getElementById("roleFilter")?.value || "",
-        page: document.getElementById("pageFilter")?.value || "",
-        startDate: document.getElementById("startDate")?.value || "",
-        endDate: document.getElementById("endDate")?.value || ""
-    };
+// Data Loading
+async function fetchLatestData() {
+    try {
+        // Store current state before refresh
+        const scrollPosition = window.scrollY;
+        const currentPageBeforeRefresh = currentPage;
 
-    applyFilters(currentFilters);
-    updateUI();
+        showLoadingIndicator(true);
+        clearError();
+
+        const response = await fetch(`${API_BASE_URL}/elastic/latest`);
+
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const newData = await response.json();
+        allData = newData.map(normalizeInteraction);
+        newDataAvailable = false;
+        setDefaultDateRange();
+        applyCurrentFilters();
+
+        // Restore the page position
+        currentPage = currentPageBeforeRefresh;
+
+        updateUI();
+        updateRefreshButtonState();
+        updateLastRefreshedTime();
+
+        // Restore scroll position
+        setTimeout(() => {
+            window.scrollTo(0, scrollPosition);
+        }, 0);
+
+    } catch (error) {
+        console.error("Error loading interactions:", error);
+        showError("Failed to load data. Please try again.");
+    } finally {
+        showLoadingIndicator(false);
+    }
 }
 
 function setDefaultDateRange() {
@@ -161,124 +179,23 @@ function setDefaultDateRange() {
     const minDate = new Date(Math.min(...timestamps));
     const maxDate = new Date(Math.max(...timestamps));
 
-    const startDateEl = document.getElementById("startDate");
-    const endDateEl = document.getElementById("endDate");
-
-    if (startDateEl) {
-        startDateEl.valueAsDate = minDate;
-        startDateEl.min = minDate.toISOString().split('T')[0];
-        startDateEl.max = maxDate.toISOString().split('T')[0];
-    }
-
-    if (endDateEl) {
-        endDateEl.valueAsDate = maxDate;
-        endDateEl.min = minDate.toISOString().split('T')[0];
-        endDateEl.max = maxDate.toISOString().split('T')[0];
-    }
+    if (elements.startDate) elements.startDate.valueAsDate = minDate;
+    if (elements.endDate) elements.endDate.valueAsDate = maxDate;
 }
 
-// Filter Functions
-function populateFilterOptions() {
-    const filters = [
-        { id: "userFilter", key: "userName", label: "User" },
-        { id: "actionFilter", key: "actionType", label: "Action" },
-        { id: "roleFilter", key: "userRole", label: "Role" },
-        { id: "pageFilter", key: "pageName", label: "Page" }
-    ];
-
-    filters.forEach(filter => {
-        const element = document.getElementById(filter.id);
-        if (!element) return;
-
-        // Save current selection
-        const currentValue = element.value;
-
-        // Reset options
-        element.innerHTML = `<option value="">All ${filter.label}</option>`;
-
-        // Get unique values
-        const uniqueValues = [...new Set(allData.map(item => item[filter.key]))]
-            .filter(Boolean)
-            .sort();
-
-        // Add options
-        uniqueValues.forEach(value => {
-            const option = document.createElement('option');
-            option.value = value;
-            option.textContent = value;
-            element.appendChild(option);
-        });
-
-        // Restore selection if still valid
-        if (uniqueValues.includes(currentValue)) {
-            element.value = currentValue;
-        }
-    });
+// UI Update functions
+function updateUI() {
+    populateFilterOptions();
+    updateTable();
+    updateStats();
+    updateCharts();
 }
 
-function applyFilters({user, action, role, page, startDate, endDate}) {
-    filteredData = allData.filter(interaction => {
-        // Apply dropdown filters
-        if (user && interaction.userName !== user) return false;
-        if (action && interaction.actionType !== action) return false;
-        if (role && interaction.userRole !== role) return false;
-        if (page && interaction.pageName !== page) return false;
-
-        // Apply date range filter
-        if (startDate) {
-            const startTimestamp = new Date(startDate).getTime();
-            if (interaction.timestamp < startTimestamp) return false;
-        }
-
-        if (endDate) {
-            const endOfDay = new Date(endDate);
-            endOfDay.setHours(23, 59, 59, 999);
-            if (interaction.timestamp > endOfDay.getTime()) return false;
-        }
-
-        return true;
-    });
-
-    // Ensure current page is valid
-    const maxPage = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
-    currentPage = Math.min(currentPage, maxPage);
-}
-
-function applyFilter() {
-    const currentFilters = {
-        user: document.getElementById("userFilter")?.value || "",
-        action: document.getElementById("actionFilter")?.value || "",
-        role: document.getElementById("roleFilter")?.value || "",
-        page: document.getElementById("pageFilter")?.value || "",
-        startDate: document.getElementById("startDate")?.value || "",
-        endDate: document.getElementById("endDate")?.value || ""
-    };
-
-    applyFilters(currentFilters);
-    updateUI();
-}
-
-function resetFilters() {
-    // Reset dropdown filters
-    document.getElementById("userFilter").value = "";
-    document.getElementById("actionFilter").value = "";
-    document.getElementById("roleFilter").value = "";
-    document.getElementById("pageFilter").value = "";
-
-    // Reset date range to cover all data
-    setDefaultDateRange();
-
-    // Apply the reset filters
-    applyFilter();
-}
-
-// Table Functions
 function updateTable() {
-    const tableBody = document.getElementById("tableBody");
-    if (!tableBody) return;
+    if (!elements.tableBody) return;
 
     if (filteredData.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6">No interactions found.</td></tr>`;
+        elements.tableBody.innerHTML = `<tr><td colspan="6">No matching interactions found.</td></tr>`;
         updatePaginationButtons();
         return;
     }
@@ -287,7 +204,7 @@ function updateTable() {
     const end = Math.min(start + rowsPerPage, filteredData.length);
     const pageData = filteredData.slice(start, end);
 
-    tableBody.innerHTML = pageData.map((interaction, index) => `
+    elements.tableBody.innerHTML = pageData.map((interaction, index) => `
         <tr>
             <td>${start + index + 1}</td>
             <td>${interaction.userName}</td>
@@ -307,77 +224,129 @@ function updateTable() {
     updatePaginationButtons();
 }
 
-function redirectToDetails(user, page) {
-    window.open(`user-page-details.html?user=${user}&page=${page}`, "_blank");
-}
-
 function updatePaginationButtons() {
-    const prevBtn = document.getElementById("prevPage");
-    const nextBtn = document.getElementById("nextPage");
-    const pageInfo = document.getElementById("pageInfo");
-
-    if (prevBtn && nextBtn && pageInfo) {
+    if (elements.prevPage && elements.nextPage && elements.pageInfo) {
         const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-        prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage >= totalPages;
-        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        elements.prevPage.disabled = currentPage === 1;
+        elements.nextPage.disabled = currentPage >= totalPages;
+        elements.pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
     }
-}
-
-// Stats Functions
-function calculateGiniCoefficient(data) {
-    const actions = data.map(interaction => interaction.actionCount || 1);
-    const n = actions.length;
-    if (n === 0) return 0;
-
-    const sortedActions = [...actions].sort((a, b) => a - b);
-    const sumActions = sortedActions.reduce((acc, val) => acc + val, 0);
-    const meanActions = sumActions / n;
-
-    let giniSum = 0;
-    for (let i = 0; i < n; i++) {
-        for (let j = 0; j < n; j++) {
-            giniSum += Math.abs(sortedActions[i] - sortedActions[j]);
-        }
-    }
-
-    return giniSum / (2 * n * n * meanActions);
 }
 
 function updateStats() {
-    // Calculate action counts per user
+    if (filteredData.length === 0) {
+        if (elements.totalActions) elements.totalActions.textContent = "0";
+        if (elements.totalUsers) elements.totalUsers.textContent = "0";
+        if (elements.usersWithActions) elements.usersWithActions.textContent = "0";
+        if (elements.actionsPerUser) elements.actionsPerUser.textContent = "0";
+        if (elements.giniPercentage) elements.giniPercentage.textContent = "0%";
+        return;
+    }
+
     const userActionCounts = {};
     filteredData.forEach(interaction => {
         const user = interaction.userName;
         userActionCounts[user] = (userActionCounts[user] || 0) + 1;
     });
 
-    // Add actionCount to each interaction
-    filteredData = filteredData.map(interaction => ({
-        ...interaction,
-        actionCount: userActionCounts[interaction.userName] || 0
-    }));
-
     const totalActions = filteredData.length;
-    const userSet = new Set(filteredData.map(interaction => interaction.userName));
-    const gini = calculateGiniCoefficient(filteredData);
+    const uniqueUsers = Object.keys(userActionCounts).length;
+    const actionsPerUser = uniqueUsers > 0 ? (totalActions / uniqueUsers).toFixed(2) : 0;
+    const gini = calculateGiniCoefficient(Object.values(userActionCounts));
     const giniPercentage = (gini * 100).toFixed(2);
 
-    // Update DOM elements
-    const setTextContent = (id, text) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text;
-    };
-
-    setTextContent("totalActions", totalActions);
-    setTextContent("totalUsers", userSet.size);
-    setTextContent("usersWithActions", userSet.size);
-    setTextContent("actionsPerUser", userSet.size ? (totalActions / userSet.size).toFixed(2) : 0);
-    setTextContent("giniPercentage", `${giniPercentage}%`);
-    setTextContent("apiHitCount", apiHitCount);
+    if (elements.totalActions) elements.totalActions.textContent = totalActions;
+    if (elements.totalUsers) elements.totalUsers.textContent = uniqueUsers;
+    if (elements.usersWithActions) elements.usersWithActions.textContent = uniqueUsers;
+    if (elements.actionsPerUser) elements.actionsPerUser.textContent = actionsPerUser;
+    if (elements.giniPercentage) elements.giniPercentage.textContent = `${giniPercentage}%`;
 }
 
-// Chart Functions
+function calculateGiniCoefficient(values) {
+    if (values.length === 0) return 0;
+
+    values.sort((a, b) => a - b);
+    const n = values.length;
+    const sum = values.reduce((a, b) => a + b, 0);
+    const mean = sum / n;
+
+    let giniSum = 0;
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            giniSum += Math.abs(values[i] - values[j]);
+        }
+    }
+
+    return giniSum / (2 * n * n * mean);
+}
+
+// Filter functions
+function applyCurrentFilters() {
+    const currentFilters = {
+        user: elements.userFilter ? elements.userFilter.value : "",
+        action: elements.actionFilter ? elements.actionFilter.value : "",
+        role: elements.roleFilter ? elements.roleFilter.value : "",
+        page: elements.pageFilter ? elements.pageFilter.value : "",
+        startDate: elements.startDate ? elements.startDate.value : "",
+        endDate: elements.endDate ? elements.endDate.value : ""
+    };
+
+    filteredData = allData.filter(interaction => {
+        if (currentFilters.user && interaction.userName !== currentFilters.user) return false;
+        if (currentFilters.action && interaction.actionType !== currentFilters.action) return false;
+        if (currentFilters.role && interaction.userRole !== currentFilters.role) return false;
+        if (currentFilters.page && interaction.pageName !== currentFilters.page) return false;
+
+        if (currentFilters.startDate) {
+            const startTimestamp = new Date(currentFilters.startDate).getTime();
+            if (interaction.timestamp < startTimestamp) return false;
+        }
+
+        if (currentFilters.endDate) {
+            const endOfDay = new Date(currentFilters.endDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            if (interaction.timestamp > endOfDay.getTime()) return false;
+        }
+
+        return true;
+    });
+
+    // Don't reset currentPage here - it will be handled by the reset button
+}
+
+function populateFilterOptions() {
+    const filters = [
+        { id: "userFilter", key: "userName", label: "User" },
+        { id: "actionFilter", key: "actionType", label: "Action" },
+        { id: "roleFilter", key: "userRole", label: "Role" },
+        { id: "pageFilter", key: "pageName", label: "Page" }
+    ];
+
+    filters.forEach(filter => {
+        const element = document.getElementById(filter.id);
+        if (!element) return;
+
+        const currentValue = element.value;
+        element.innerHTML = `<option value="">All ${filter.label}</option>`;
+
+        const uniqueValues = [...new Set(allData.map(item => item[filter.key]))]
+            .filter(Boolean)
+            .sort();
+
+        uniqueValues.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            element.appendChild(option);
+        });
+
+        if (uniqueValues.includes(currentValue)) {
+            element.value = currentValue;
+        }
+    });
+}
+
+// Chart functions
 function updateCharts() {
     updateChart('actionChart', 'bar', 'Actions Performed', "#007bff", 'actionType');
     updateDailyActionChart();
@@ -388,28 +357,21 @@ function updateCharts() {
 function updateChart(canvasId, type, label, color, property) {
     try {
         const canvas = document.getElementById(canvasId);
-        if (!canvas) {
-            console.error(`Canvas not found: ${canvasId}`);
-            return;
-        }
+        if (!canvas) return;
 
-        // Filter out interactions without the property
         const validData = filteredData.filter(i => i[property]);
         if (validData.length === 0) return;
 
-        // Count occurrences
         const counts = {};
         validData.forEach(interaction => {
             const key = interaction[property];
             counts[key] = (counts[key] || 0) + 1;
         });
 
-        // Destroy previous chart if exists
         if (chartInstances[canvasId]) {
             chartInstances[canvasId].destroy();
         }
 
-        // Create new chart
         const ctx = canvas.getContext('2d');
         chartInstances[canvasId] = new Chart(ctx, {
             type,
@@ -444,30 +406,26 @@ function updateDailyActionChart() {
         const canvas = document.getElementById('dailyActionChart');
         if (!canvas) return;
 
-        // Count actions per date
         const dateCounts = {};
         filteredData.forEach(interaction => {
             const date = interaction.datePart;
             dateCounts[date] = (dateCounts[date] || 0) + 1;
         });
 
-        // Sort by date
         const sortedDates = Object.keys(dateCounts).sort((a, b) => new Date(a) - new Date(b));
         const sortedCounts = sortedDates.map(date => dateCounts[date]);
 
-        // Destroy previous chart
         if (chartInstances['dailyActionChart']) {
             chartInstances['dailyActionChart'].destroy();
         }
 
-        // Create new chart
         const ctx = canvas.getContext('2d');
         chartInstances['dailyActionChart'] = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: sortedDates,
                 datasets: [{
-                    label: 'Total Actions per Day',
+                    label: 'Actions per Day',
                     data: sortedCounts,
                     borderColor: "#28a745",
                     backgroundColor: "rgba(40, 167, 69, 0.1)",
@@ -485,7 +443,7 @@ function updateDailyActionChart() {
                     },
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Number of Actions' }
+                        title: { display: true, text: 'Actions' }
                     }
                 }
             }
@@ -500,30 +458,26 @@ function updateRankingChart(canvasId, property, label, type = 'bar') {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
 
-        // Count occurrences
         const counts = {};
         filteredData.forEach(interaction => {
             const key = interaction[property] || `Unknown ${label}`;
             counts[key] = (counts[key] || 0) + 1;
         });
 
-        // Sort and get top items
         const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
         const topItems = type === 'pie' ? sorted : sorted.slice(0, 5);
 
-        // Destroy previous chart
         if (chartInstances[canvasId]) {
             chartInstances[canvasId].destroy();
         }
 
-        // Create new chart
         const ctx = canvas.getContext('2d');
         chartInstances[canvasId] = new Chart(ctx, {
             type,
             data: {
                 labels: topItems.map(([key]) => key),
                 datasets: [{
-                    label: type === 'pie' ? `Users by ${label}` : 'Actions',
+                    label: type === 'pie' ? `By ${label}` : 'Actions',
                     data: topItems.map(([, count]) => count),
                     backgroundColor: type === 'pie' ? [
                         "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f",
@@ -545,14 +499,14 @@ function updateRankingChart(canvasId, property, label, type = 'bar') {
                     tooltip: {
                         callbacks: {
                             label: type === 'pie' ? undefined : (context) =>
-                                `Rank ${context.dataIndex + 1}: ${context.raw} actions`
+                                `${context.label}: ${context.raw} actions`
                         }
                     }
                 },
                 scales: type === 'pie' ? undefined : {
                     x: {
                         beginAtZero: true,
-                        title: { display: true, text: "Number of Actions" }
+                        title: { display: true, text: "Actions" }
                     },
                     y: {
                         title: { display: true, text: label }
@@ -565,61 +519,125 @@ function updateRankingChart(canvasId, property, label, type = 'bar') {
     }
 }
 
-// UI Update Function
-function updateUI() {
-    populateFilterOptions();
-    updateTable();
-    updateStats();
-    updateCharts();
+// UI Helpers
+function showLoadingIndicator(show) {
+    if (elements.refreshButton && elements.loadingIndicator) {
+        elements.refreshButton.disabled = show;
+        elements.loadingIndicator.style.display = show ? 'block' : 'none';
+    }
+}
+
+function showError(message) {
+    if (elements.errorMessage) {
+        elements.errorMessage.textContent = message;
+        elements.errorMessage.style.display = 'block';
+    }
+}
+
+function clearError() {
+    if (elements.errorMessage) {
+        elements.errorMessage.style.display = 'none';
+    }
+}
+
+function updateLastRefreshedTime() {
+    if (elements.lastRefreshedTime) {
+        elements.lastRefreshedTime.textContent = new Date().toLocaleTimeString();
+    }
+}
+
+function redirectToDetails(user, page) {
+    window.open(`user-page-details.html?user=${user}&page=${page}`, "_blank");
 }
 
 // Event Listeners
 function setupEventListeners() {
-    // Pagination
-    document.getElementById("prevPage")?.addEventListener("click", () => {
-        if (currentPage > 1) {
-            currentPage--;
-            updateTable();
-        }
-    });
+    if (elements.refreshButton) {
+        elements.refreshButton.addEventListener("click", fetchLatestData);
+    }
 
-    document.getElementById("nextPage")?.addEventListener("click", () => {
-        if (currentPage * rowsPerPage < filteredData.length) {
-            currentPage++;
-            updateTable();
-        }
-    });
+    if (elements.sendInteractionsButton) {
+        elements.sendInteractionsButton.addEventListener("click", async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/interactions/send-from-file`, {
+                    method: "POST"
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                showNotification("Test data sent successfully");
+            } catch (error) {
+                console.error("Error sending test data:", error);
+                showError("Failed to send test data");
+            }
+        });
+    }
 
-    // Buttons
-    document.getElementById("sendInteractionsButton")?.addEventListener("click", async () => {
-        try {
-            const response = await fetch("http://localhost:9090/api/interactions/send-from-file", {
-                method: "POST"
-            });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            console.log("Interactions sent successfully");
-        } catch (error) {
-            console.error("Error sending interactions:", error);
-        }
-    });
+    if (elements.applyFilterButton) {
+        elements.applyFilterButton.addEventListener("click", () => {
+            currentPage = 1; // Reset to page 1 only when applying new filters
+            applyCurrentFilters();
+            updateUI();
+        });
+    }
 
-    document.getElementById("applyFilterButton")?.addEventListener("click", applyFilter);
-    document.getElementById("resetFilterButton")?.addEventListener("click", resetFilters);
-    document.getElementById("refreshButton")?.addEventListener("click", loadInteractions);
+    if (elements.resetFilterButton) {
+        elements.resetFilterButton.addEventListener("click", () => {
+            if (elements.userFilter) elements.userFilter.value = "";
+            if (elements.actionFilter) elements.actionFilter.value = "";
+            if (elements.roleFilter) elements.roleFilter.value = "";
+            if (elements.pageFilter) elements.pageFilter.value = "";
+            setDefaultDateRange();
+            currentPage = 1; // Reset to page 1 when resetting filters
+            applyCurrentFilters();
+            updateUI();
+        });
+    }
+
+    if (elements.prevPage) {
+        elements.prevPage.addEventListener("click", () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateTable();
+            }
+        });
+    }
+
+    if (elements.nextPage) {
+        elements.nextPage.addEventListener("click", () => {
+            if (currentPage * rowsPerPage < filteredData.length) {
+                currentPage++;
+                updateTable();
+            }
+        });
+    }
 }
 
-// Initialization
+// Initialize the app
 function initializeApp() {
-    setupEventListeners();
-    initWebSocket();
-    loadInteractions();
+    // Reset all state
+    allData = [];
+    filteredData = [];
+    currentPage = 1;
+    newDataAvailable = false;
 
-    // Initial UI update
+    // Clear charts
+    Object.values(chartInstances).forEach(chart => chart.destroy());
+    chartInstances = {};
+
+    // Initialize UI
+    setupEventListeners();
     updateUI();
+    updateRefreshButtonState();
+
+    // Connect WebSocket
+    connectWebSocket();
+
+    // Load initial data
+    fetchLatestData();
 }
 
-// Start the application when DOM is loaded
+// Start when DOM is loaded
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-// Make redirect function available globally
+// Make functions available globally
 window.redirectToDetails = redirectToDetails;
+window.fetchLatestData = fetchLatestData;

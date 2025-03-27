@@ -4,6 +4,10 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -11,14 +15,15 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.ssl.SSLContexts;
 import org.elasticsearch.client.RestClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 
+import javax.annotation.PreDestroy;
 import javax.net.ssl.SSLContext;
+import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -27,14 +32,16 @@ import java.security.NoSuchAlgorithmException;
 @EnableElasticsearchRepositories(basePackages = "com.example.userinteraction.repository")
 public class ElasticsearchConfig {
 
-    @Value("${spring.elasticsearch.uris}")
-    private String elasticsearchUrl;
+    @Value("${elasticsearch.cloud.endpoint}")
+    private String endpoint;
 
-    @Value("${spring.elasticsearch.username}")
+    @Value("${elasticsearch.username}")
     private String username;
 
-    @Value("${spring.elasticsearch.password}")
+    @Value("${elasticsearch.password}")
     private String password;
+
+    private RestClient restClient;
 
     @Bean
     public RestClient restClient() throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
@@ -44,30 +51,47 @@ public class ElasticsearchConfig {
                 new UsernamePasswordCredentials(username, password)
         );
 
-        // Create SSL context that trusts all certificates (for development only)
         SSLContext sslContext = SSLContextBuilder
                 .create()
                 .loadTrustMaterial(null, (chain, authType) -> true)
                 .build();
 
-        return RestClient.builder(HttpHost.create(elasticsearchUrl))
+        this.restClient = RestClient.builder(HttpHost.create(endpoint))
                 .setHttpClientConfigCallback(httpClientBuilder -> {
                     httpClientBuilder
                             .setDefaultCredentialsProvider(credentialsProvider)
                             .setSSLContext(sslContext)
-                            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
+                            .setSSLHostnameVerifier(new NoopHostnameVerifier());
                     return httpClientBuilder;
                 })
                 .build();
+
+        return restClient;
     }
 
     @Bean
     public ElasticsearchTransport elasticsearchTransport(RestClient restClient) {
-        return new RestClientTransport(restClient, new JacksonJsonpMapper());
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .configure( DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        return new RestClientTransport(restClient, new JacksonJsonpMapper(objectMapper));
     }
 
     @Bean
     public ElasticsearchClient elasticsearchClient(ElasticsearchTransport transport) {
         return new ElasticsearchClient(transport);
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        try {
+            if (restClient != null) {
+                restClient.close();
+            }
+        } catch (IOException e) {
+            // Log error if needed
+        }
     }
 }

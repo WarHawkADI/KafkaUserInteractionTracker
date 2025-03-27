@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -43,6 +43,21 @@
             font-weight: bold;
             z-index: 1000;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .connection-status.connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .connection-status.connecting {
+            background-color: #FFC107;
+            color: black;
         }
 
         /* Stats Section */
@@ -101,11 +116,6 @@
             color: white;
         }
 
-        #sendInteractionsButton {
-            background-color: #2196f3;
-            color: white;
-        }
-
         .apply-button {
             background-color: #4caf50;
             color: white;
@@ -124,6 +134,12 @@
 
         button:active {
             transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
         }
 
         /* Filters */
@@ -264,6 +280,7 @@
             border-top-color: #4fc3f7;
             animation: spin 1s ease-in-out infinite;
             margin-right: 10px;
+            vertical-align: middle;
         }
 
         @keyframes spin {
@@ -306,6 +323,41 @@
             box-shadow: none;
         }
 
+        /* Notification */
+        .notification {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            animation: slideIn 0.3s forwards, fadeOut 0.5s forwards 5s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+
+        /* Refresh Button State */
+        .refresh-button-new-data {
+            background-color: #ff9800 !important;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .filter-group {
@@ -328,11 +380,19 @@
     <button class="page-button" onclick="goBackToDashboard()">← Back to Dashboard</button>
     <h2 id="pageTitle">User Page Details</h2>
 
+    <div id="connectionStatus" class="connection-status disconnected">
+        WebSocket: Disconnected
+    </div>
+
     <div class="stats">
         <div class="stat-box">Total Actions: <span id="totalActions">0</span></div>
         <div class="stat-box">First Activity: <span id="firstActivity">N/A</span></div>
         <div class="stat-box">Last Activity: <span id="lastActivity">N/A</span></div>
         <div class="stat-box">Most Frequent Action: <span id="mostFrequentAction">N/A</span></div>
+    </div>
+
+    <div class="button-group">
+        <button id="refreshButton">Refresh Data</button>
     </div>
 
     <div class="filter-group">
@@ -349,6 +409,12 @@
         <button id="applyFilter" class="apply-button">Apply Filter</button>
         <button id="resetFilter" class="reset-button">Reset</button>
     </div>
+
+    <div id="loadingIndicator" style="display: none;">
+        <span class="loading-spinner"></span> Loading data...
+    </div>
+
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
 
     <div class="table-container">
         <table>
@@ -375,17 +441,42 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
 <script>
     // Global variables
+    const API_BASE_URL = 'http://localhost:9090';
     let allDetails = [];
     let filteredDetails = [];
     let currentPage = 1;
     const rowsPerPage = 10;
     let isLoading = false;
+    let stompClient = null;
+    let socket = null;
+    let newDataAvailable = false;
+    let retryCount = 0;
+    let isExplicitDisconnect = false;
 
-    function goBackToDashboard() {
-        window.location.href = 'index.html';
-    }
+    // DOM Elements
+    const elements = {
+        refreshButton: document.getElementById("refreshButton"),
+        applyFilter: document.getElementById("applyFilter"),
+        resetFilter: document.getElementById("resetFilter"),
+        prevPage: document.getElementById("prevPage"),
+        nextPage: document.getElementById("nextPage"),
+        pageInfo: document.getElementById("pageInfo"),
+        loadingIndicator: document.getElementById("loadingIndicator"),
+        errorMessage: document.getElementById("errorMessage"),
+        actionFilter: document.getElementById("actionFilter"),
+        startDate: document.getElementById("startDate"),
+        endDate: document.getElementById("endDate"),
+        totalActions: document.getElementById("totalActions"),
+        firstActivity: document.getElementById("firstActivity"),
+        lastActivity: document.getElementById("lastActivity"),
+        mostFrequentAction: document.getElementById("mostFrequentAction"),
+        connectionStatus: document.getElementById("connectionStatus"),
+        detailsTableBody: document.getElementById("detailsTableBody")
+    };
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -395,47 +486,133 @@
     // Set page title
     document.getElementById('pageTitle').textContent = `Activity Details for ${user} on ${page}`;
 
-    // Format date for display
+    // Utility functions
+    function goBackToDashboard() {
+        window.location.href = 'index.html';
+    }
+
     function formatDate(timestamp) {
         if (!timestamp) return 'N/A';
         const date = new Date(timestamp);
         return isNaN(date.getTime()) ? timestamp : date.toLocaleString();
     }
 
-    // Show loading spinner
     function showLoading(show) {
         isLoading = show;
-        const spinner = document.querySelector('.loading-spinner');
-        if (spinner) {
-            spinner.style.visibility = show ? 'visible' : 'hidden';
+        if (elements.loadingIndicator) {
+            elements.loadingIndicator.style.display = show ? 'block' : 'none';
+        }
+        if (elements.refreshButton) {
+            elements.refreshButton.disabled = show;
         }
     }
 
-    // Show error message
     function showError(message) {
-        const errorHtml = `
-            <div class="error-message">
-                <strong>Error:</strong> ${message}
-            </div>
-        `;
-        document.querySelector('.container').insertAdjacentHTML('beforeend', errorHtml);
+        if (elements.errorMessage) {
+            elements.errorMessage.textContent = message;
+            elements.errorMessage.style.display = 'block';
+        }
     }
 
-    // Clear errors
     function clearError() {
-        const errorElement = document.querySelector('.error-message');
-        if (errorElement) errorElement.remove();
+        if (elements.errorMessage) {
+            elements.errorMessage.style.display = 'none';
+        }
     }
 
-    // Load data from API
+    function showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
+
+    // WebSocket functions
+    function connectWebSocket() {
+        if (isExplicitDisconnect) return;
+
+        console.log('Attempting WebSocket connection...');
+        updateConnectionStatus(false, "Connecting...");
+
+        try {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+
+            socket = new SockJS(`${API_BASE_URL}/ws`);
+            stompClient = Stomp.over(socket);
+
+            stompClient.debug = (msg) => console.debug('STOMP:', msg);
+
+            stompClient.connect({},
+                (frame) => {
+                    console.log('WebSocket connected:', frame);
+                    retryCount = 0;
+                    updateConnectionStatus(true);
+
+                    stompClient.subscribe('/topic/notifications', (message) => {
+                        console.log('WS Message:', message.body);
+                        if (message.body === "NEW_DATA_AVAILABLE") {
+                            newDataAvailable = true;
+                            showNotification("New data available! Click Refresh to load.");
+                            updateRefreshButtonState();
+                        }
+                    });
+                },
+                (error) => {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus(false, `Disconnected - Retrying in ${Math.min(5, retryCount)}s...`);
+                    setTimeout(connectWebSocket, Math.min(5000, 1000 * Math.pow(2, retryCount++)));
+                }
+            );
+        } catch (error) {
+            console.error('WebSocket connection failed:', error);
+            updateConnectionStatus(false, "Connection failed");
+            setTimeout(connectWebSocket, 5000);
+        }
+    }
+
+    function updateConnectionStatus(connected, message = "") {
+        if (!elements.connectionStatus) return;
+
+        if (connected) {
+            elements.connectionStatus.textContent = "WebSocket: Connected";
+            elements.connectionStatus.className = "connection-status connected";
+        } else {
+            elements.connectionStatus.textContent = message || "WebSocket: Disconnected";
+            elements.connectionStatus.className = "connection-status disconnected";
+        }
+    }
+
+    function updateRefreshButtonState() {
+        if (elements.refreshButton) {
+            if (newDataAvailable) {
+                elements.refreshButton.classList.add("refresh-button-new-data");
+                elements.refreshButton.textContent = "Refresh (New Data Available)";
+            } else {
+                elements.refreshButton.classList.remove("refresh-button-new-data");
+                elements.refreshButton.textContent = "Refresh Data";
+            }
+        }
+    }
+
+    // Data loading functions
     async function loadDetails() {
         try {
             if (isLoading) return;
             showLoading(true);
             clearError();
 
+            // Store current state before refresh
+            const scrollPosition = window.scrollY;
+            const currentPageBeforeRefresh = currentPage;
+
             const response = await fetch(
-                `http://localhost:9090/api/interactions/details?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`,
+                `${API_BASE_URL}/interactions/details?user=${encodeURIComponent(user)}&page=${encodeURIComponent(page)}`,
                 {
                     headers: { 'Accept': 'application/json' }
                 }
@@ -466,37 +643,36 @@
             populateFilters();
             applyFilter();
 
+            // Restore scroll position
+            setTimeout(() => {
+                window.scrollTo(0, scrollPosition);
+            }, 0);
+
         } catch (error) {
             console.error('Error loading details:', error);
             showError(`Failed to load details: ${error.message}`);
-            document.getElementById('detailsTableBody').innerHTML =
+            elements.detailsTableBody.innerHTML =
                 '<tr><td colspan="6">Failed to load data. Please try again.</td></tr>';
         } finally {
             showLoading(false);
         }
     }
 
-    // Update statistics
     function updateStats() {
-        const totalEl = document.getElementById('totalActions');
-        const firstEl = document.getElementById('firstActivity');
-        const lastEl = document.getElementById('lastActivity');
-        const freqEl = document.getElementById('mostFrequentAction');
-
         if (!allDetails.length) {
-            totalEl.textContent = '0';
-            firstEl.textContent = 'N/A';
-            lastEl.textContent = 'N/A';
-            freqEl.textContent = 'N/A';
+            elements.totalActions.textContent = '0';
+            elements.firstActivity.textContent = 'N/A';
+            elements.lastActivity.textContent = 'N/A';
+            elements.mostFrequentAction.textContent = 'N/A';
             return;
         }
 
-        totalEl.textContent = allDetails.length;
+        elements.totalActions.textContent = allDetails.length;
 
         const dates = allDetails.map(d => new Date(d.createdAt)).filter(d => !isNaN(d.getTime()));
         if (dates.length) {
-            firstEl.textContent = formatDate(new Date(Math.min(...dates)));
-            lastEl.textContent = formatDate(new Date(Math.max(...dates)));
+            elements.firstActivity.textContent = formatDate(new Date(Math.min(...dates)));
+            elements.lastActivity.textContent = formatDate(new Date(Math.max(...dates)));
         }
 
         const actionCounts = {};
@@ -504,38 +680,35 @@
             actionCounts[d.actionType] = (actionCounts[d.actionType] || 0) + 1;
         });
         const mostFrequent = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0];
-        freqEl.textContent = mostFrequent ? `${mostFrequent[0]} (${mostFrequent[1]})` : 'N/A';
+        elements.mostFrequentAction.textContent = mostFrequent ? `${mostFrequent[0]} (${mostFrequent[1]})` : 'N/A';
     }
 
-    // Populate action type filter
     function populateFilters() {
-        const filter = document.getElementById('actionFilter');
-        if (!filter) return;
+        if (!elements.actionFilter) return;
 
-        filter.innerHTML = '<option value="">All Actions</option>';
+        elements.actionFilter.innerHTML = '<option value="">All Actions</option>';
         const actions = [...new Set(allDetails.map(d => d.actionType))].filter(Boolean);
         actions.forEach(action => {
             const option = document.createElement('option');
             option.value = action;
             option.textContent = action;
-            filter.appendChild(option);
+            elements.actionFilter.appendChild(option);
         });
 
         // Set default date range
         if (allDetails.length) {
             const dates = allDetails.map(d => new Date(d.createdAt)).filter(d => !isNaN(d.getTime()));
             if (dates.length) {
-                document.getElementById('startDate').valueAsDate = new Date(Math.min(...dates));
-                document.getElementById('endDate').valueAsDate = new Date(Math.max(...dates));
+                elements.startDate.valueAsDate = new Date(Math.min(...dates));
+                elements.endDate.valueAsDate = new Date(Math.max(...dates));
             }
         }
     }
 
-    // Apply filters
     function applyFilter() {
-        const actionType = document.getElementById('actionFilter').value;
-        const startDate = document.getElementById('startDate').valueAsDate;
-        const endDate = document.getElementById('endDate').valueAsDate;
+        const actionType = elements.actionFilter.value;
+        const startDate = elements.startDate.valueAsDate;
+        const endDate = elements.endDate.valueAsDate;
 
         filteredDetails = allDetails.filter(detail => {
             if (actionType && detail.actionType !== actionType) return false;
@@ -555,28 +728,24 @@
         updateTable();
     }
 
-    // Reset filters
     function resetFilters() {
-        document.getElementById('actionFilter').value = '';
+        elements.actionFilter.value = '';
 
         if (allDetails.length) {
             const dates = allDetails.map(d => new Date(d.createdAt)).filter(d => !isNaN(d.getTime()));
             if (dates.length) {
-                document.getElementById('startDate').valueAsDate = new Date(Math.min(...dates));
-                document.getElementById('endDate').valueAsDate = new Date(Math.max(...dates));
+                elements.startDate.valueAsDate = new Date(Math.min(...dates));
+                elements.endDate.valueAsDate = new Date(Math.max(...dates));
             }
         }
 
+        currentPage = 1;
         applyFilter();
     }
 
-    // Update table with pagination
     function updateTable() {
-        const tbody = document.getElementById('detailsTableBody');
-        if (!tbody) return;
-
         if (!filteredDetails.length) {
-            tbody.innerHTML = '<tr><td colspan="6">No matching records found</td></tr>';
+            elements.detailsTableBody.innerHTML = '<tr><td colspan="6">No matching records found</td></tr>';
             updatePagination();
             return;
         }
@@ -584,7 +753,7 @@
         const startIdx = (currentPage - 1) * rowsPerPage;
         const paginatedData = filteredDetails.slice(startIdx, startIdx + rowsPerPage);
 
-        tbody.innerHTML = paginatedData.map((detail, i) => `
+        elements.detailsTableBody.innerHTML = paginatedData.map((detail, i) => `
             <tr>
                 <td>${startIdx + i + 1}</td>
                 <td>${detail.actionType}</td>
@@ -598,36 +767,54 @@
         updatePagination();
     }
 
-    // Update pagination controls
     function updatePagination() {
         const totalPages = Math.ceil(filteredDetails.length / rowsPerPage);
-        const prevBtn = document.getElementById('prevPage');
-        const nextBtn = document.getElementById('nextPage');
-        const pageInfo = document.getElementById('pageInfo');
-
-        if (prevBtn) prevBtn.disabled = currentPage <= 1;
-        if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
-        if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        if (elements.prevPage) elements.prevPage.disabled = currentPage <= 1;
+        if (elements.nextPage) elements.nextPage.disabled = currentPage >= totalPages;
+        if (elements.pageInfo) elements.pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
     }
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('applyFilter').addEventListener('click', applyFilter);
-        document.getElementById('resetFilter').addEventListener('click', resetFilters);
-        document.getElementById('prevPage').addEventListener('click', () => {
+        // Set up event listeners
+        elements.refreshButton.addEventListener('click', () => {
+            newDataAvailable = false;
+            updateRefreshButtonState();
+            loadDetails();
+        });
+
+        elements.applyFilter.addEventListener('click', () => {
+            currentPage = 1;
+            applyFilter();
+        });
+
+        elements.resetFilter.addEventListener('click', resetFilters);
+
+        elements.prevPage.addEventListener('click', () => {
             if (currentPage > 1) {
                 currentPage--;
                 updateTable();
             }
         });
-        document.getElementById('nextPage').addEventListener('click', () => {
+
+        elements.nextPage.addEventListener('click', () => {
             if (currentPage * rowsPerPage < filteredDetails.length) {
                 currentPage++;
                 updateTable();
             }
         });
 
+        // Connect WebSocket and load initial data
+        connectWebSocket();
         loadDetails();
+    });
+
+    // Clean up WebSocket on page unload
+    window.addEventListener('beforeunload', () => {
+        isExplicitDisconnect = true;
+        if (stompClient !== null) {
+            stompClient.disconnect();
+        }
     });
 </script>
 </body>

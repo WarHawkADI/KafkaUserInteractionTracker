@@ -10,10 +10,9 @@ import org.springframework.context.annotation.Configuration;
 public class JacksonConfig {
 
     @Bean
-    public ObjectMapper customObjectMapper() { // Renamed to avoid conflict
+    public ObjectMapper customObjectMapper() {
         return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
-
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }

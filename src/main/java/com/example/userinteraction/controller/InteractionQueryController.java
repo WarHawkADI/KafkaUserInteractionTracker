@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/interactions")
+@RequestMapping("/interactions")
 @CrossOrigin(origins = "http://localhost:5500")
 public class InteractionQueryController {
 

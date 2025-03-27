@@ -5,7 +5,7 @@ import com.example.userinteraction.service.KafkaProducerService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/interactions")
+@RequestMapping("/interactions")
 public class UserInteractionController {
 
     private final KafkaProducerService kafkaProducerService;
