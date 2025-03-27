@@ -1,7 +1,7 @@
 // Global variables
 const API_BASE_URL = 'http://localhost:9090';
 let currentPage = 1;
-const rowsPerPage = 5;
+const rowsPerPage = 10;
 let allData = [];
 let filteredData = [];
 let chartInstances = {};
@@ -83,7 +83,7 @@ function connectWebSocket() {
 
     socket = new SockJS(API_BASE_URL + '/ws');
     stompClient = Stomp.over(socket);
-    stompClient.debug = () => {}; // Disable debug logging
+    stompClient.debug = () => {};
 
     elements.connectionStatus.textContent = "WebSocket: Connecting...";
     elements.connectionStatus.className = "connection-status connecting";
@@ -100,7 +100,6 @@ function connectWebSocket() {
         });
     }, function(error) {
         updateConnectionStatus(false);
-        console.error("WebSocket connection error:", error);
         setTimeout(connectWebSocket, 5000);
     });
 }
@@ -143,11 +142,8 @@ function showNotification(message) {
 // Data Loading
 async function fetchLatestData() {
     try {
-        // Prevent rapid refreshes
         const now = Date.now();
-        if (now - lastRefreshTimestamp < 2000 && !isInitialLoad) { // 2 second cooldown
-            return;
-        }
+        if (now - lastRefreshTimestamp < 2000 && !isInitialLoad) return;
         isInitialLoad = false;
         lastRefreshTimestamp = now;
 
@@ -155,22 +151,29 @@ async function fetchLatestData() {
         clearError();
 
         const response = await fetch(`${API_BASE_URL}/elastic/latest`);
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-        const newData = await response.json();
-        const normalizedNewData = newData.map(normalizeInteraction);
+        // Store current scroll and page position
+        const scrollPosition = window.scrollY;
+        const currentPageBeforeRefresh = currentPage;
 
-        // Replace all data instead of merging to prevent duplicates
-        allData = normalizedNewData;
+        // Replace all data (no merging)
+        allData = (await response.json()).map(normalizeInteraction);
         newDataAvailable = false;
 
         setDefaultDateRange();
         applyCurrentFilters();
+
+        // Restore page position
+        currentPage = currentPageBeforeRefresh;
         updateUI();
         updateRefreshButtonState();
         updateLastRefreshedTime();
+
+        // Restore scroll position
+        setTimeout(() => {
+            window.scrollTo(0, scrollPosition);
+        }, 0);
 
     } catch (error) {
         console.error("Error loading interactions:", error);
@@ -327,7 +330,10 @@ function applyCurrentFilters() {
         return true;
     });
 
-    currentPage = 1; // Reset to first page when filters change
+    // Only reset to page 1 when filters change, not on new data
+    if (Object.values(currentFilters).some(filter => filter !== "")) {
+        currentPage = 1;
+    }
 }
 
 function populateFilterOptions() {
@@ -627,26 +633,19 @@ function setupEventListeners() {
 
 // Initialize the app
 function initializeApp() {
-    // Reset all state
     allData = [];
     filteredData = [];
     currentPage = 1;
     newDataAvailable = false;
     isInitialLoad = true;
 
-    // Clear charts
     Object.values(chartInstances).forEach(chart => chart.destroy());
     chartInstances = {};
 
-    // Initialize UI
     setupEventListeners();
     updateUI();
     updateRefreshButtonState();
-
-    // Connect WebSocket
     connectWebSocket();
-
-    // Load initial data
     fetchLatestData();
 }
 
