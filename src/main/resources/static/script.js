@@ -1,7 +1,7 @@
 // Global variables
 const API_BASE_URL = 'http://localhost:9090';
 let currentPage = 1;
-const rowsPerPage = 10;
+const rowsPerPage = 5;
 let allData = [];
 let filteredData = [];
 let chartInstances = {};
